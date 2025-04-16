@@ -1,0 +1,174 @@
+/* GameControls.css */
+.game-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  background-color: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  width: 100%;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.game-controls__main {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--space-md);
+}
+
+.game-controls__start-button {
+  width: 100%;
+  max-width: 250px;
+  padding: var(--space-md) var(--space-xl);
+  font-size: 1.2rem;
+  background: linear-gradient(90deg, var(--accent-tertiary), var(--accent-primary));
+  border: none;
+  box-shadow: 0 0 15px rgba(79, 70, 229, 0.5);
+  transition: all 0.3s ease;
+  animation: pulse 2s infinite;
+}
+
+.game-controls__start-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 20px rgba(79, 70, 229, 0.7);
+}
+
+.game-controls__settings {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-sm) 0;
+  border-top: 1px solid var(--bg-tertiary);
+  border-bottom: 1px solid var(--bg-tertiary);
+}
+
+.game-controls__difficulty {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.game-controls__label {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.game-controls__difficulty-buttons {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.game-controls__difficulty-button {
+  background-color: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border: none;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.game-controls__difficulty-button:hover {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.game-controls__difficulty-button--active {
+  background-color: var(--accent-primary);
+  color: white;
+}
+
+.game-controls__volume {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.game-controls__mute-button {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: var(--space-xs);
+  border-radius: var(--radius-sm);
+  transition: all 0.2s ease;
+}
+
+.game-controls__mute-button:hover {
+  background-color: var(--bg-tertiary);
+}
+
+.game-controls__mute-button--muted {
+  color: var(--text-secondary);
+}
+
+.game-controls__volume-slider {
+  width: 80px;
+}
+
+.game-controls__volume-slider input {
+  width: 100%;
+  -webkit-appearance: none;
+  height: 4px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-full);
+  outline: none;
+}
+
+.game-controls__volume-slider input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent-primary);
+  cursor: pointer;
+}
+
+.game-controls__volume-slider input::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent-primary);
+  cursor: pointer;
+  border: none;
+}
+
+.game-controls__instructions {
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-top: var(--space-sm);
+}
+
+.game-controls__key {
+  display: inline-block;
+  background-color: var(--bg-tertiary);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  font-family: monospace;
+  font-size: 0.8rem;
+  margin: 0 var(--space-xs);
+  color: var(--text-primary);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .game-controls__settings {
+    flex-direction: column;
+    gap: var(--space-sm);
+    align-items: flex-start;
+  }
+  
+  .game-controls__volume {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .game-controls__volume-slider {
+    width: 70%;
+  }
+}

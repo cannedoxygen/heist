@@ -1,0 +1,86 @@
+/* PlayerRank.css */
+.player-rank {
+  background-color: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  margin-bottom: var(--space-lg);
+  border-left: 3px solid var(--accent-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.player-rank__header {
+  margin-bottom: var(--space-md);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: var(--space-sm);
+}
+
+.player-rank__header h3 {
+  font-size: 1.2rem;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.player-rank__content {
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr;
+  gap: var(--space-md);
+}
+
+.player-rank__position,
+.player-rank__wallet,
+.player-rank__score {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.player-rank__label {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+}
+
+.player-rank__value {
+  font-size: 1rem;
+  color: var(--text-primary);
+  font-weight: bold;
+}
+
+.player-rank__position .player-rank__value {
+  color: var(--accent-secondary);
+  font-size: 1.2rem;
+}
+
+.player-rank__wallet .player-rank__value {
+  font-family: monospace;
+  word-break: break-all;
+}
+
+.player-rank__score .player-rank__value {
+  color: var(--data-blue);
+}
+
+.player-rank__motivational {
+  margin-top: var(--space-md);
+  padding-top: var(--space-sm);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--accent-secondary);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .player-rank__content {
+    grid-template-columns: 1fr;
+    gap: var(--space-sm);
+  }
+  
+  .player-rank__position,
+  .player-rank__wallet,
+  .player-rank__score {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+}

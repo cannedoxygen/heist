@@ -1,0 +1,101 @@
+/* WalletConnection.css */
+.wallet-connection {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background-color: var(--bg-secondary);
+    padding: var(--space-lg);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    width: 100%;
+    max-width: 400px;
+    margin: 0 auto;
+  }
+  
+  .wallet-connection__header {
+    text-align: center;
+    margin-bottom: var(--space-lg);
+  }
+  
+  .wallet-connection__header h2 {
+    font-size: 1.5rem;
+    margin-bottom: var(--space-sm);
+    color: var(--text-primary);
+  }
+  
+  .wallet-connection__header p {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+  }
+  
+  .wallet-connection__options {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    gap: var(--space-md);
+  }
+  
+  .wallet-connection--connected {
+    flex-direction: row;
+    justify-content: space-between;
+    padding: var(--space-md);
+  }
+  
+  .wallet-connection__info {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .wallet-connection__address {
+    font-family: monospace;
+    color: var(--text-primary);
+    font-weight: bold;
+  }
+  
+  .wallet-connection__status {
+    font-size: 0.8rem;
+    color: var(--success);
+  }
+  
+  /* Wallet buttons */
+  .wallet-button {
+    padding: var(--space-md);
+    border-radius: var(--radius-md);
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-sm);
+    transition: all 0.2s ease;
+  }
+  
+  .wallet-button--phantom {
+    background-color: #512da8;
+    color: white;
+  }
+  
+  .wallet-button--rainbow {
+    background: linear-gradient(45deg, #ff4e50, #fc913a, #f9d423, #ede574, #8bcf69, #73a5c6, #9b59b6);
+    color: white;
+  }
+  
+  .wallet-button--walletconnect {
+    background-color: #3b99fc;
+    color: white;
+  }
+  
+  .wallet-button--network {
+    background-color: var(--accent-primary);
+    color: white;
+  }
+  
+  .wallet-button--disconnect {
+    background-color: transparent;
+    color: var(--text-secondary);
+    padding: var(--space-xs) var(--space-sm);
+    font-size: 0.8rem;
+  }
+  
+  .wallet-button--disconnect:hover {
+    color: var(--error);
+  }

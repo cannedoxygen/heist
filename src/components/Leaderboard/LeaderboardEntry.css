@@ -1,0 +1,90 @@
+/* LeaderboardEntry.css */
+.leaderboard-entry {
+  display: grid;
+  grid-template-columns: 0.5fr 2fr 1fr 1.5fr;
+  padding: var(--space-md);
+  border-bottom: 1px solid var(--bg-secondary);
+  transition: background-color 0.2s ease;
+}
+
+.leaderboard-entry:hover {
+  background-color: var(--bg-secondary);
+}
+
+.leaderboard-entry--player {
+  background-color: rgba(79, 70, 229, 0.1);
+  border-left: 3px solid var(--accent-primary);
+}
+
+.leaderboard-entry--player:hover {
+  background-color: rgba(79, 70, 229, 0.15);
+}
+
+.leaderboard-entry__rank {
+  text-align: center;
+  font-weight: bold;
+  color: var(--text-primary);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.leaderboard-entry__trophy {
+  font-size: 1.2rem;
+}
+
+.leaderboard-entry__wallet {
+  display: flex;
+  align-items: center;
+  color: var(--text-primary);
+  font-family: monospace;
+  font-size: 0.9rem;
+  gap: var(--space-sm);
+}
+
+.leaderboard-entry__you-badge {
+  background-color: var(--accent-primary);
+  color: white;
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  font-family: 'Orbitron', sans-serif;
+}
+
+.leaderboard-entry__score {
+  text-align: right;
+  font-weight: bold;
+  color: var(--data-blue);
+  font-size: 1.1rem;
+}
+
+.leaderboard-entry__date {
+  text-align: right;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+/* Top 3 styling */
+.leaderboard-entry:nth-child(1) .leaderboard-entry__score {
+  color: var(--data-gold, gold);
+  font-size: 1.2rem;
+}
+
+.leaderboard-entry:nth-child(2) .leaderboard-entry__score {
+  color: var(--data-silver, silver);
+}
+
+.leaderboard-entry:nth-child(3) .leaderboard-entry__score {
+  color: var(--data-bronze, #cd7f32);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .leaderboard-entry {
+    grid-template-columns: 0.5fr 1.5fr 1fr 0fr;
+  }
+  
+  .leaderboard-entry__date {
+    display: none;
+  }
+}

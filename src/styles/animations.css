@@ -1,0 +1,179 @@
+/* animations.css - Common animations for the game */
+
+/* Fade in */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  
+  .fade-in {
+    animation: fadeIn 0.3s ease forwards;
+  }
+  
+  /* Fade out */
+  @keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+  
+  .fade-out {
+    animation: fadeOut 0.3s ease forwards;
+  }
+  
+  /* Slide up */
+  @keyframes slideUp {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  
+  .slide-up {
+    animation: slideUp 0.3s ease forwards;
+  }
+  
+  /* Slide down */
+  @keyframes slideDown {
+    from { transform: translateY(-20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  
+  .slide-down {
+    animation: slideDown 0.3s ease forwards;
+  }
+  
+  /* Pulse */
+  @keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+  }
+  
+  .pulse {
+    animation: pulse 2s infinite;
+  }
+  
+  /* Blink */
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  
+  .blink {
+    animation: blink 1s infinite;
+  }
+  
+  /* Rotate */
+  @keyframes rotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  
+  .rotate {
+    animation: rotate 2s linear infinite;
+  }
+  
+  /* Shake */
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+    20%, 40%, 60%, 80% { transform: translateX(5px); }
+  }
+  
+  .shake {
+    animation: shake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+  }
+  
+  /* Data flow animation for game elements */
+  @keyframes dataFlow {
+    0% { 
+      background-position: 0% 0%;
+      box-shadow: 0 0 5px var(--data-blue);
+    }
+    50% {
+      box-shadow: 0 0 15px var(--data-blue);
+    }
+    100% { 
+      background-position: 100% 100%;
+      box-shadow: 0 0 5px var(--data-blue);
+    }
+  }
+  
+  .data-flow {
+    background: linear-gradient(45deg, 
+      rgba(56, 189, 248, 0.1) 0%,
+      rgba(79, 70, 229, 0.1) 25%, 
+      rgba(244, 114, 182, 0.1) 50%, 
+      rgba(52, 211, 153, 0.1) 75%,
+      rgba(56, 189, 248, 0.1) 100%
+    );
+    background-size: 400% 400%;
+    animation: dataFlow 3s ease infinite;
+  }
+  
+  /* Glitch effect for game over */
+  @keyframes glitch {
+    0% {
+      transform: translate(0);
+    }
+    20% {
+      transform: translate(-3px, 3px);
+    }
+    40% {
+      transform: translate(-3px, -3px);
+    }
+    60% {
+      transform: translate(3px, 3px);
+    }
+    80% {
+      transform: translate(3px, -3px);
+    }
+    100% {
+      transform: translate(0);
+    }
+  }
+  
+  .glitch {
+    position: relative;
+    animation: glitch 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) both infinite;
+  }
+  
+  .glitch::before,
+  .glitch::after {
+    content: attr(data-text);
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
+  
+  .glitch::before {
+    left: 2px;
+    text-shadow: -1px 0 var(--error);
+    clip: rect(44px, 450px, 56px, 0);
+    animation: glitch-anim 5s infinite linear alternate-reverse;
+  }
+  
+  .glitch::after {
+    left: -2px;
+    text-shadow: -1px 0 var(--accent-secondary);
+    clip: rect(24px, 450px, 100px, 0);
+    animation: glitch-anim2 5s infinite linear alternate-reverse;
+  }
+  
+  @keyframes glitch-anim {
+    0% { clip: rect(15px, 9999px, 30px, 0); }
+    20% { clip: rect(8px, 9999px, 94px, 0); }
+    40% { clip: rect(53px, 9999px, 98px, 0); }
+    60% { clip: rect(79px, 9999px, 26px, 0); }
+    80% { clip: rect(32px, 9999px, 78px, 0); }
+    100% { clip: rect(25px, 9999px, 55px, 0); }
+  }
+  
+  @keyframes glitch-anim2 {
+    0% { clip: rect(62px, 9999px, 45px, 0); }
+    20% { clip: rect(92px, 9999px, 5px, 0); }
+    40% { clip: rect(1px, 9999px, 14px, 0); }
+    60% { clip: rect(89px, 9999px, 46px, 0); }
+    80% { clip: rect(16px, 9999px, 31px, 0); }
+    100% { clip: rect(7px, 9999px, 82px, 0); }
+  }

@@ -1,0 +1,125 @@
+/* Modal.css */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: var(--z-modal);
+    animation: fadeIn 0.3s ease;
+  }
+  
+  .modal {
+    background-color: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    display: flex;
+    flex-direction: column;
+    max-height: 90vh;
+    animation: slideIn 0.3s ease;
+    position: relative;
+    border: 1px solid var(--bg-tertiary);
+    overflow: hidden;
+  }
+  
+  /* Modal sizes */
+  .modal--small {
+    width: 90%;
+    max-width: 400px;
+  }
+  
+  .modal--medium {
+    width: 90%;
+    max-width: 600px;
+  }
+  
+  .modal--large {
+    width: 90%;
+    max-width: 800px;
+  }
+  
+  .modal--fullscreen {
+    width: 95%;
+    height: 95%;
+    max-width: none;
+  }
+  
+  .modal__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-md) var(--space-lg);
+    border-bottom: 1px solid var(--bg-tertiary);
+  }
+  
+  .modal__title {
+    font-size: 1.2rem;
+    color: var(--text-primary);
+    margin: 0;
+    font-weight: 600;
+  }
+  
+  .modal__close-button {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: var(--space-xs);
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s ease;
+  }
+  
+  .modal__close-button:hover {
+    color: var(--text-primary);
+  }
+  
+  .modal__content {
+    padding: var(--space-lg);
+    overflow-y: auto;
+    flex: 1;
+  }
+  
+  /* Animations */
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  
+  @keyframes slideIn {
+    from { transform: translateY(-20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  
+  @keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+  
+  @keyframes slideOut {
+    from { transform: translateY(0); opacity: 1; }
+    to { transform: translateY(20px); opacity: 0; }
+  }
+  
+  /* Modal closing animations */
+  .modal-closing {
+    animation: fadeOut 0.3s ease, slideOut 0.3s ease;
+  }
+  
+  /* Responsive adjustments */
+  @media (max-width: 768px) {
+    .modal__content {
+      padding: var(--space-md);
+    }
+    
+    .modal__header {
+      padding: var(--space-sm) var(--space-md);
+    }
+  }

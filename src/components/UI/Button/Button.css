@@ -1,0 +1,114 @@
+/* Button.css */
+.button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-md);
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    text-decoration: none;
+    border: none;
+    outline: none;
+  }
+  
+  /* Size variants */
+  .button--small {
+    padding: var(--space-xs) var(--space-md);
+    font-size: 0.8rem;
+  }
+  
+  .button--medium {
+    padding: var(--space-sm) var(--space-lg);
+    font-size: 1rem;
+  }
+  
+  .button--large {
+    padding: var(--space-md) var(--space-xl);
+    font-size: 1.1rem;
+  }
+  
+  /* Color variants */
+  .button--primary {
+    background-color: var(--accent-primary);
+    color: white;
+  }
+  
+  .button--primary:hover:not(.button--disabled) {
+    background-color: var(--accent-tertiary);
+    box-shadow: 0 0 8px rgba(79, 70, 229, 0.5);
+  }
+  
+  .button--secondary {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--text-secondary);
+  }
+  
+  .button--secondary:hover:not(.button--disabled) {
+    background-color: var(--bg-secondary);
+    border-color: var(--text-primary);
+  }
+  
+  .button--success {
+    background-color: var(--success);
+    color: white;
+  }
+  
+  .button--success:hover:not(.button--disabled) {
+    background-color: #0d9668;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+  }
+  
+  .button--warning {
+    background-color: var(--warning);
+    color: white;
+  }
+  
+  .button--warning:hover:not(.button--disabled) {
+    background-color: #d97706;
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
+  }
+  
+  .button--danger {
+    background-color: var(--error);
+    color: white;
+  }
+  
+  .button--danger:hover:not(.button--disabled) {
+    background-color: #dc2626;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+  }
+  
+  .button--ghost {
+    background-color: transparent;
+    color: var(--text-primary);
+  }
+  
+  .button--ghost:hover:not(.button--disabled) {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+  
+  /* Disabled state */
+  .button--disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+  
+  /* With icon */
+  .button-icon {
+    margin-right: var(--space-sm);
+  }
+  
+  /* Focus state for accessibility */
+  .button:focus {
+    outline: 2px solid var(--accent-secondary);
+    outline-offset: 2px;
+  }
+  
+  /* Active/pressed state */
+  .button:active:not(.button--disabled) {
+    transform: translateY(1px);
+  }
