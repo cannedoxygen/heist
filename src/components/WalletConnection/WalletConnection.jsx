@@ -1,5 +1,6 @@
 import React, { useContext } from 'react';
-import { WalletContext } from '../../context/WalletContext';
+import { WalletContext } from '../../context/WalletContext.js';
+import { getAppKit } from '@reown/appkit/react';
 import Button from '../UI/Button/Button';
 import './WalletConnection.css';
 
@@ -8,13 +9,18 @@ const WalletConnection = () => {
     isConnected, 
     walletAddress, 
     isConnecting, 
-    connectWallet, 
     disconnectWallet, 
     formatAddress,
     isCorrectNetwork,
-    switchToBaseNetwork,
-    connectors
+    switchToBaseNetwork
   } = useContext(WalletContext);
+
+  const appKit = getAppKit();
+
+  // Handle connect wallet
+  const handleConnectWallet = () => {
+    appKit.open();
+  };
 
   // Render connect wallet UI if not connected
   if (!isConnected) {
@@ -26,18 +32,13 @@ const WalletConnection = () => {
         </div>
         
         <div className="wallet-connection__options">
-          {connectors.map((connector) => (
-            <Button
-              key={connector.id}
-              onClick={() => connectWallet(connector)}
-              className={`wallet-button wallet-button--${connector.id}`}
-              disabled={isConnecting}
-            >
-              {isConnecting && pendingConnector?.id === connector.id 
-                ? 'Connecting...' 
-                : `Connect ${connector.name}`}
-            </Button>
-          ))}
+          <Button
+            onClick={handleConnectWallet}
+            className="wallet-button"
+            disabled={isConnecting}
+          >
+            {isConnecting ? 'Connecting...' : 'Connect Wallet'}
+          </Button>
         </div>
       </div>
     );

@@ -1,17 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import HomePage from './pages/HomePage/HomePage';
 import GamePage from './pages/GamePage/GamePage';
 import LeaderboardPage from './pages/LeaderboardPage/LeaderboardPage';
-import { WalletContextProvider } from './context/WalletContext';
-import { GameContextProvider } from './context/GameContext';
-import { LeaderboardContextProvider } from './context/LeaderboardContext';
+import { AppKitProvider } from './config/appkit';
+import { GameContextProvider } from './context/GameContext.js';
+import { LeaderboardContextProvider } from './context/LeaderboardContext.js';
 import './App.css';
 
 const App = () => {
   return (
-    <Router>
-      <WalletContextProvider>
+    <AppKitProvider>
+      <Router>
         <GameContextProvider>
           <LeaderboardContextProvider>
             <div className="app">
@@ -23,8 +23,8 @@ const App = () => {
             </div>
           </LeaderboardContextProvider>
         </GameContextProvider>
-      </WalletContextProvider>
-    </Router>
+      </Router>
+    </AppKitProvider>
   );
 };
 

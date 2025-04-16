@@ -1,6 +1,6 @@
 import React, { createContext, useState, useContext, useCallback } from 'react';
-import { WalletContext } from './WalletContext';
-import { LeaderboardContext } from './LeaderboardContext';
+import { WalletContext } from './WalletContext.js';
+import { LeaderboardContext } from './LeaderboardContext.js';
 
 // Create game context
 export const GameContext = createContext(null);
