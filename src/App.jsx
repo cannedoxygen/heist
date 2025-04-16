@@ -3,14 +3,14 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import HomePage from './pages/HomePage/HomePage';
 import GamePage from './pages/GamePage/GamePage';
 import LeaderboardPage from './pages/LeaderboardPage/LeaderboardPage';
-import { AppKitProvider } from './config/appkit';
-import { GameContextProvider } from './context/GameContext.js';
-import { LeaderboardContextProvider } from './context/LeaderboardContext.js';
+import { WalletProvider } from './context/WalletContext';
+import { GameContextProvider } from './context/GameContext';
+import { LeaderboardContextProvider } from './context/LeaderboardContext';
 import './App.css';
 
 const App = () => {
   return (
-    <AppKitProvider>
+    <WalletProvider>
       <Router>
         <GameContextProvider>
           <LeaderboardContextProvider>
@@ -24,7 +24,7 @@ const App = () => {
           </LeaderboardContextProvider>
         </GameContextProvider>
       </Router>
-    </AppKitProvider>
+    </WalletProvider>
   );
 };
 

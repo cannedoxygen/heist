@@ -1,6 +1,5 @@
-import React, { useContext } from 'react';
-import { WalletContext } from '../../context/WalletContext.js';
-import { getAppKit } from '@reown/appkit/react';
+import React, { useContext, useEffect } from 'react';
+import { WalletContext } from '../../context/WalletContext';
 import Button from '../UI/Button/Button';
 import './WalletConnection.css';
 
@@ -9,17 +8,25 @@ const WalletConnection = () => {
     isConnected, 
     walletAddress, 
     isConnecting, 
+    connectWallet,
     disconnectWallet, 
     formatAddress,
     isCorrectNetwork,
     switchToBaseNetwork
   } = useContext(WalletContext);
 
-  const appKit = getAppKit();
+  // Add debug useEffect
+  useEffect(() => {
+    console.log('WalletConnection component rendered');
+    console.log('isConnected:', isConnected);
+    console.log('walletAddress:', walletAddress);
+    console.log('isConnecting:', isConnecting);
+  }, [isConnected, walletAddress, isConnecting]);
 
-  // Handle connect wallet
-  const handleConnectWallet = () => {
-    appKit.open();
+  // Debug handler for connect button
+  const handleConnectClick = () => {
+    console.log('Connect button clicked');
+    connectWallet();
   };
 
   // Render connect wallet UI if not connected
@@ -33,7 +40,7 @@ const WalletConnection = () => {
         
         <div className="wallet-connection__options">
           <Button
-            onClick={handleConnectWallet}
+            onClick={handleConnectClick}
             className="wallet-button"
             disabled={isConnecting}
           >

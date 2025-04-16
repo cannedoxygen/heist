@@ -1,32 +1,32 @@
 import { createAppKit } from '@reown/appkit/react'
 import { WagmiProvider } from 'wagmi'
-import { arbitrum, mainnet } from '@reown/appkit/networks'
+import { base, mainnet } from 'wagmi/chains'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
 
 // 0. Setup queryClient
 const queryClient = new QueryClient()
 
-// 1. Get projectId from https://cloud.reown.com
-const projectId = '9a0374575383749a8967f0039bd2c7f5'
+// 1. Get projectId from https://cloud.walletconnect.com
+const projectId = process.env.REACT_APP_WALLETCONNECT_PROJECT_ID || '9a0374575383749a8967f0039bd2c7f5'
 
 // 2. Create a metadata object - optional
 const metadata = {
   name: 'Aikira Heist',
-  description: 'AppKit Example',
-  url: 'https://reown.com/appkit', // origin must match your domain & subdomain
+  description: 'AIKIRA: Data Heist - Endless runner game with futuristic AI interface',
+  url: window.location.origin, // origin will match your domain & subdomain
   icons: ['https://assets.reown.com/reown-profile-pic.png']
 }
 
 // 3. Set the networks
-const networks = [mainnet, arbitrum]
+const networks = [mainnet, base]
 
 // 4. Create Wagmi Adapter
 const wagmiAdapter = new WagmiAdapter({
   networks,
   projectId,
-  ssr: true
-});
+  ssr: typeof window === 'undefined'
+})
 
 // 5. Create modal
 createAppKit({
