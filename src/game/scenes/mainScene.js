@@ -64,14 +64,6 @@ export class MainScene extends Phaser.Scene {
   preload() {
     console.log('Preloading assets...');
     
-    // Check environment for debugging
-    console.log('Environment info:', {
-      baseUrl: window.location.origin,
-      pathname: window.location.pathname,
-      publicPath: process.env.PUBLIC_URL || '',
-      nodeEnv: process.env.NODE_ENV
-    });
-    
     // Create a loading bar for visual feedback
     const progressBar = this.add.graphics();
     const progressBox = this.add.graphics();
@@ -123,78 +115,35 @@ export class MainScene extends Phaser.Scene {
       loadingText.destroy();
     });
     
-    // Try multiple asset path formats - one of these should work
-    try {
-      // Try path format 1: just the path (most common)
-      this.load.image('player', 'assets/images/player.png');
-      this.load.image('obstacle', 'assets/images/obstacle.png');
-      this.load.image('data', 'assets/images/data.png');
-      this.load.image('background', 'assets/images/grid_bg.png');
-      
-      // Try path format 2: with leading slash
-      this.load.image('player_alt1', '/assets/images/player.png');
-      
-      // Try path format 3: with PUBLIC_URL
-      const publicUrl = process.env.PUBLIC_URL || '';
-      this.load.image('player_alt2', `${publicUrl}/assets/images/player.png`);
-      
-      // Try path format 4: with absolute URL
-      const baseUrl = window.location.origin;
-      this.load.image('player_alt3', `${baseUrl}/assets/images/player.png`);
-      
-      // Load audio with the same approach as images
-      this.load.audio('jump', 'assets/audio/jump.mp3');
-      this.load.audio('collect', 'assets/audio/collect.mp3');
-      this.load.audio('hit', 'assets/audio/hit.mp3');
-      this.load.audio('gameover', 'assets/audio/gameover.mp3');
-    } catch (e) {
-      console.error('Error in asset loading:', e);
-    }
+    // Explicitly set the path for images - use public folder path
+    this.load.setPath('/assets/images/');
+    this.load.image('player', 'player.png');
+    this.load.image('obstacle', 'obstacle.png');
+    this.load.image('data', 'data.png');
+    this.load.image('background', 'grid_bg.png');
     
-    // Explicitly check if files exist using fetch
-    const filesToCheck = [
-      'assets/images/player.png',
-      '/assets/images/player.png',
-      './assets/images/player.png'
-    ];
-    
-    filesToCheck.forEach(path => {
-      fetch(path)
-        .then(response => {
-          console.log(`Fetch ${path}: ${response.status} ${response.statusText}`);
-          if (response.ok) {
-            console.log(`File exists at ${path}`);
-          } else {
-            console.log(`File not found at ${path}`);
-          }
-        })
-        .catch(error => {
-          console.error(`Fetch error for ${path}:`, error);
-        });
-    });
+    // Set path for audio assets
+    this.load.setPath('/assets/audio/');
+    this.load.audio('jump', 'jump.mp3');
+    this.load.audio('collect', 'collect.mp3');
+    this.load.audio('hit', 'hit.mp3');
+    this.load.audio('gameover', 'gameover.mp3');
   }
   
   create() {
     console.log('Creating game scene');
+    
+    // Get game dimensions
+    const gameWidth = this.cameras.main.width;  // Should be 800
+    const gameHeight = this.cameras.main.height; // Should be 400
+    console.log(`Game dimensions: ${gameWidth}x${gameHeight}`);
+    
+    // Debug to check asset loading
     console.log('Texture status before fallbacks:');
     console.log('- player:', this.textures.exists('player'));
     console.log('- obstacle:', this.textures.exists('obstacle'));
     console.log('- data:', this.textures.exists('data'));
     console.log('- background:', this.textures.exists('background'));
-    
-    // Check if any alternates loaded
-    const playerAlternates = [
-      'player_alt1', 'player_alt2', 'player_alt3'
-    ];
-    
-    for (const alt of playerAlternates) {
-      if (this.textures.exists(alt)) {
-        console.log(`Found alternate texture: ${alt}`);
-        // Clone this texture to the primary key
-        this.textures.addImage('player', this.textures.get(alt).getSourceImage());
-        break;
-      }
-    }
     
     // Create fallback assets if needed
     this.createFallbackAssets();
@@ -205,41 +154,57 @@ export class MainScene extends Phaser.Scene {
     console.log('- data:', this.textures.exists('data'));
     console.log('- background:', this.textures.exists('background'));
     
-    // Create background
+    // Create background for 3D runner effect
     try {
-      this.background = this.add.tileSprite(0, 0, this.cameras.main.width, this.cameras.main.height, 'background')
+      // Create tileSprite with grid
+      this.background = this.add.tileSprite(0, 0, gameWidth, gameHeight, 'background')
         .setOrigin(0, 0)
         .setScrollFactor(0, 0);
+      
+      // Check background texture dimensions
+      if (this.textures.exists('background')) {
+        const bgImage = this.textures.get('background').getSourceImage();
+        console.log(`Background texture dimensions: ${bgImage.width}x${bgImage.height}`);
+        
+        // Set tileScale to 1 since the texture is already correctly sized
+        this.background.tileScaleX = 1;
+        this.background.tileScaleY = 1;
+        
+        console.log('Background tileScale set to 1x1');
+      }
+      
       console.log('Created background with texture');
     } catch (e) {
       console.error('Error creating background:', e);
       // Fallback to simple rectangle
-      this.background = this.add.rectangle(0, 0, this.cameras.main.width, this.cameras.main.height, 0x0a0e17)
+      this.background = this.add.rectangle(0, 0, gameWidth, gameHeight, 0x0a0e17)
         .setOrigin(0, 0);
       console.log('Created fallback background rectangle');
     }
     
-    // Create ground
-    this.groundY = this.cameras.main.height - 50;
-    this.ground = this.add.rectangle(0, this.groundY, this.cameras.main.width, 2, 0x4f46e5)
+    // Create center lane marker
+    const centerX = gameWidth / 2;
+    this.centerLine = this.add.line(0, 0, centerX, 0, centerX, gameHeight, 0x4f46e5, 0.3)
+      .setOrigin(0, 0);
+    
+    // Create ground - positioned at the bottom of the screen
+    this.groundY = gameHeight - 50;
+    this.ground = this.add.rectangle(0, this.groundY, gameWidth, 2, 0x4f46e5)
       .setOrigin(0, 0);
     this.physics.add.existing(this.ground, true);
     
-    // Create player
-    try {
-      this.player = new Player(this, 100, this.groundY - 50);
-      console.log('Player created successfully');
-    } catch (e) {
-      console.error('Error creating player:', e);
-      // Fallback to simple player rectangle
-      this.player = this.physics.add.sprite(100, this.groundY - 50, 'player');
-      this.player.setDisplaySize(30, 30);
-      this.player.setTint(0x4f46e5);
-      this.player.setCollideWorldBounds(true);
-      this.player.setBounce(0.1);
-      this.player.setGravityY(1000);
-      this.player.jumpForce = -500;
-      console.log('Created fallback player object');
+    // Create player in center of screen
+    if (this.textures.exists('player')) {
+      try {
+        this.player = new Player(this, centerX, this.groundY - 50);
+        console.log('Player created successfully');
+      } catch (e) {
+        console.error('Error creating player:', e);
+        this.createSimplePlayer(centerX);
+      }
+    } else {
+      console.log('Player texture does not exist, creating simple player');
+      this.createSimplePlayer(centerX);
     }
     
     // Create groups
@@ -277,7 +242,7 @@ export class MainScene extends Phaser.Scene {
     
     // Add difficulty text
     this.difficultyText = this.add.text(
-      this.cameras.main.width - 20, 
+      gameWidth - 20, 
       20, 
       `LEVEL: ${this.difficulty.toUpperCase()}`, 
       {
@@ -287,9 +252,27 @@ export class MainScene extends Phaser.Scene {
       }
     ).setScrollFactor(0).setOrigin(1, 0);
     
-    // Setup input
+    // Setup input for jumping
     this.input.on('pointerdown', this.jump, this);
     this.input.keyboard.on('keydown-SPACE', this.jump, this);
+    
+    // Add keyboard controls for left/right movement
+    this.cursors = this.input.keyboard.createCursorKeys();
+    
+    // Add swipe controls for mobile
+    this.input.on('pointermove', this.handleSwipe, this);
+    this.input.on('pointerup', this.endSwipe, this);
+    this.swipeStart = null;
+    
+    // Game lanes settings
+    this.lanes = [
+      gameWidth / 4,           // Left lane
+      gameWidth / 2,           // Center lane
+      (gameWidth / 4) * 3      // Right lane
+    ];
+    
+    // Current lane (start in center)
+    this.currentLane = 1;
     
     // Start game
     this.isGameOver = false;
@@ -307,36 +290,119 @@ export class MainScene extends Phaser.Scene {
     console.log('Game scene created successfully');
   }
   
+  // Create a simple player rectangle
+  createSimplePlayer(centerX) {
+    console.log('Creating simple player rectangle');
+    this.player = this.physics.add.rectangle(centerX, this.groundY - 50, 30, 30, 0x4f46e5);
+    this.player.setCollideWorldBounds(true);
+    this.player.setBounce(0.1);
+    this.player.setGravityY(1000);
+    
+    // Add custom jump method
+    this.player.jump = function() {
+      if (this.body.touching.down) {
+        this.setVelocityY(-500);
+      }
+    };
+    
+    // Add lane movement method
+    this.player.moveTo = function(x, duration = 200) {
+      this.scene.tweens.add({
+        targets: this,
+        x: x,
+        duration: duration,
+        ease: 'Power2'
+      });
+    };
+  }
+  
+  // Handle swiping on mobile
+  handleSwipe(pointer) {
+    if (!this.swipeStart) {
+      this.swipeStart = { x: pointer.x, y: pointer.y, time: pointer.time };
+    }
+  }
+  
+  endSwipe(pointer) {
+    if (this.swipeStart && !this.isGameOver) {
+      const swipeTime = pointer.time - this.swipeStart.time;
+      const swipeDistance = Phaser.Math.Distance.Between(
+        this.swipeStart.x, this.swipeStart.y, 
+        pointer.x, pointer.y
+      );
+      
+      // Check if this is a valid swipe
+      if (swipeTime < 1000 && swipeDistance > 50) {
+        // Check swipe direction
+        const swipeX = pointer.x - this.swipeStart.x;
+        const swipeY = pointer.y - this.swipeStart.y;
+        
+        // Horizontal swipe detection (with greater tolerance for diagonal swipes)
+        if (Math.abs(swipeX) > Math.abs(swipeY) * 0.5) {
+          if (swipeX > 0) {
+            this.moveRight();
+          } else {
+            this.moveLeft();
+          }
+        }
+        
+        // Vertical swipe detection - only for upward swipes (jump)
+        if (swipeY < -50 && Math.abs(swipeY) > Math.abs(swipeX)) {
+          this.jump();
+        }
+      }
+    }
+    
+    // Reset swipe start
+    this.swipeStart = null;
+  }
+  
   createFallbackAssets() {
+    // Create fallback textures one by one with specific error handling
     try {
-      // Create fallback textures if assets didn't load
       if (!this.textures.exists('player')) {
         console.log('Creating fallback player texture');
         const graphics = this.make.graphics({ x: 0, y: 0, add: false });
         graphics.fillStyle(0x4f46e5, 1);
-        graphics.fillCircle(15, 15, 15);
+        graphics.fillRect(0, 0, 30, 30); // Use rectangle instead of circle for simplicity
         graphics.generateTexture('player', 30, 30);
+        console.log('Player texture created:', this.textures.exists('player'));
         graphics.destroy();
       }
-      
+    } catch (e) {
+      console.error('Failed to create player texture:', e);
+    }
+    
+    // Separate try/catch for each texture
+    try {
       if (!this.textures.exists('obstacle')) {
         console.log('Creating fallback obstacle texture');
         const graphics = this.make.graphics({ x: 0, y: 0, add: false });
         graphics.fillStyle(0xef4444, 1);
         graphics.fillRect(0, 0, 40, 20);
         graphics.generateTexture('obstacle', 40, 20);
+        console.log('Obstacle texture created:', this.textures.exists('obstacle'));
         graphics.destroy();
       }
-      
+    } catch (e) {
+      console.error('Failed to create obstacle texture:', e);
+    }
+    
+    try {
       if (!this.textures.exists('data')) {
         console.log('Creating fallback data texture');
         const graphics = this.make.graphics({ x: 0, y: 0, add: false });
         graphics.fillStyle(0x38bdf8, 1);
         graphics.fillRect(0, 0, 24, 24);
         graphics.generateTexture('data', 24, 24);
+        console.log('Data texture created:', this.textures.exists('data'));
         graphics.destroy();
       }
-      
+    } catch (e) {
+      console.error('Failed to create data texture:', e);
+    }
+    
+    try {
       if (!this.textures.exists('background')) {
         console.log('Creating fallback background texture');
         const graphics = this.make.graphics({ x: 0, y: 0, add: false });
@@ -345,19 +411,27 @@ export class MainScene extends Phaser.Scene {
         graphics.lineStyle(1, 0x1d2837, 0.3);
         graphics.strokeRect(0, 0, 32, 32);
         graphics.generateTexture('background', 64, 64);
+        console.log('Background texture created:', this.textures.exists('background'));
         graphics.destroy();
       }
     } catch (e) {
-      console.error('Error creating fallback assets:', e);
+      console.error('Failed to create background texture:', e);
     }
   }
   
   update(time, delta) {
     if (this.isGameOver) return;
     
-    // Move background
-    if (this.background && this.background.tilePositionX !== undefined) {
-      this.background.tilePositionX += (this.gameSpeed / 60) * (delta / 16.666);
+    // Move background (scrolling down effect for 3D feel)
+    if (this.background && this.background.tilePositionY !== undefined) {
+      this.background.tilePositionY += (this.gameSpeed / 120) * (delta / 16.666);
+    }
+    
+    // Handle keyboard controls
+    if (this.cursors.left.isDown) {
+      this.moveLeft();
+    } else if (this.cursors.right.isDown) {
+      this.moveRight();
     }
     
     // Spawn timers
@@ -380,42 +454,121 @@ export class MainScene extends Phaser.Scene {
     
     // Update obstacles and collectibles
     this.obstacles.getChildren().forEach(obstacle => {
+      // Update custom obstacle animations
       if (typeof obstacle.update === 'function') {
         obstacle.update();
       }
       
+      // Move obstacles forward (down)
+      obstacle.y += (this.gameSpeed / 60) * (delta / 16.666);
+      
       // Remove if off screen
-      if (obstacle.x < -obstacle.width) {
+      if (obstacle.y > this.cameras.main.height + 50) {
         obstacle.destroy();
       }
     });
     
     this.collectibles.getChildren().forEach(collectible => {
+      // Update custom collectible animations
       if (typeof collectible.update === 'function') {
         collectible.update();
       }
       
+      // Move collectibles forward (down)
+      collectible.y += (this.gameSpeed / 60) * (delta / 16.666);
+      
       // Remove if off screen
-      if (collectible.x < -collectible.width) {
+      if (collectible.y > this.cameras.main.height + 50) {
         collectible.destroy();
       }
     });
   }
   
+  // Player left lane movement
+  moveLeft() {
+    if (this.isGameOver) return;
+    
+    // Check if we can move left
+    if (this.currentLane > 0) {
+      this.currentLane--;
+      const targetX = this.lanes[this.currentLane];
+      
+      // Move player to the target lane
+      if (this.player.moveTo) {
+        this.player.moveTo(targetX);
+      } else {
+        // For standard sprites without a custom moveTo method
+        this.tweens.add({
+          targets: this.player,
+          x: targetX,
+          duration: 200,
+          ease: 'Power2'
+        });
+      }
+      
+      // Play a sound effect if available
+      try {
+        if (this.sound && this.sound.get('move')) {
+          this.sound.play('move', { volume: 0.3 });
+        }
+      } catch (e) {
+        console.error('Error playing move sound:', e);
+      }
+    }
+  }
+  
+  // Player right lane movement
+  moveRight() {
+    if (this.isGameOver) return;
+    
+    // Check if we can move right
+    if (this.currentLane < this.lanes.length - 1) {
+      this.currentLane++;
+      const targetX = this.lanes[this.currentLane];
+      
+      // Move player to the target lane
+      if (this.player.moveTo) {
+        this.player.moveTo(targetX);
+      } else {
+        // For standard sprites without a custom moveTo method
+        this.tweens.add({
+          targets: this.player,
+          x: targetX,
+          duration: 200,
+          ease: 'Power2'
+        });
+      }
+      
+      // Play a sound effect if available
+      try {
+        if (this.sound && this.sound.get('move')) {
+          this.sound.play('move', { volume: 0.3 });
+        }
+      } catch (e) {
+        console.error('Error playing move sound:', e);
+      }
+    }
+  }
+  
   jump() {
     try {
-      if (!this.isGameOver && this.player && this.player.body && this.player.body.touching.down) {
-        // Use player's jump method if available
-        if (typeof this.player.jump === 'function') {
-          this.player.jump();
-        } else {
-          // Otherwise apply velocity directly
-          this.player.body.setVelocityY(-500);
-        }
+      if (!this.isGameOver && this.player) {
+        // Check if player is on ground
+        const isOnGround = this.player.body && this.player.body.touching && this.player.body.touching.down;
         
-        // Play sound with safety check
-        if (this.sound.get('jump')) {
-          this.sound.play('jump', { volume: 0.5 });
+        if (isOnGround) {
+          // Use player's jump method if available
+          if (typeof this.player.jump === 'function') {
+            this.player.jump();
+          } else {
+            // Otherwise apply velocity directly
+            this.player.body.setVelocityY(-500);
+          }
+          
+          // Play sound with safety check
+          if (this.sound && this.sound.get && this.sound.get('jump')) {
+            this.sound.play('jump', { volume: 0.5 });
+          }
         }
       }
     } catch (e) {
@@ -425,90 +578,97 @@ export class MainScene extends Phaser.Scene {
   
   spawnObstacle() {
     try {
-      // Random obstacle height
+      // Random lane
+      const lane = Phaser.Math.Between(0, this.lanes.length - 1);
+      const laneX = this.lanes[lane];
+      
+      // Random obstacle size
       const height = Phaser.Math.Between(20, 40);
+      const width = Phaser.Math.Between(30, 80);
       
-      // Create obstacle
-      const obstacle = new Obstacle(
-        this, 
-        this.cameras.main.width + 100, 
-        this.groundY - height / 2, 
-        this.gameSpeed
-      );
+      // Position at top of screen but in the right lane
+      const obstacleY = -50; // Just above the screen
       
-      this.obstacles.add(obstacle);
-      console.log('Obstacle spawned');
-    } catch (e) {
-      console.error('Error spawning obstacle:', e);
-      
-      // Create fallback obstacle
-      try {
-        const height = Phaser.Math.Between(20, 40);
-        const width = Phaser.Math.Between(30, 80);
+      // Check if we have the obstacle texture
+      if (this.textures.exists('obstacle')) {
+        // Create obstacle sprite directly (without using the class)
+        const obstacle = this.physics.add.sprite(laneX, obstacleY, 'obstacle');
+        obstacle.setDisplaySize(width, height);
+        obstacle.setTint(0xef4444);
         
-        const fallbackObstacle = this.physics.add.sprite(
-          this.cameras.main.width + 100,
-          this.groundY - height / 2,
-          'obstacle'
+        // Set the physics properties
+        obstacle.body.allowGravity = false;
+        obstacle.body.immovable = true;
+        
+        this.obstacles.add(obstacle);
+        console.log('Obstacle spawned in lane', lane);
+      } else {
+        // Use rectangle as fallback
+        const rectObstacle = this.physics.add.rectangle(
+          laneX,
+          obstacleY,
+          width,
+          height,
+          0xef4444
         );
         
-        fallbackObstacle.setDisplaySize(width, height);
-        fallbackObstacle.setVelocityX(-this.gameSpeed);
-        fallbackObstacle.setImmovable(true);
-        fallbackObstacle.body.allowGravity = false;
+        rectObstacle.body.allowGravity = false;
+        rectObstacle.body.immovable = true;
         
-        this.obstacles.add(fallbackObstacle);
-        console.log('Fallback obstacle spawned');
-      } catch (innerE) {
-        console.error('Failed to create fallback obstacle:', innerE);
+        this.obstacles.add(rectObstacle);
       }
+    } catch (e) {
+      console.error('Error spawning obstacle:', e);
     }
   }
   
   spawnCollectible() {
     try {
-      // Random y position
-      const y = Phaser.Math.Between(
-        this.groundY - 200, 
-        this.groundY - 50
-      );
+      // Random lane
+      const lane = Phaser.Math.Between(0, this.lanes.length - 1);
+      const laneX = this.lanes[lane];
       
-      // Create data collectible
-      const collectible = new Collectible(
-        this, 
-        this.cameras.main.width + 100, 
-        y, 
-        this.gameSpeed
-      );
+      // Position above the screen
+      const collectibleY = -50;
       
-      this.collectibles.add(collectible);
-      console.log('Collectible spawned');
+      // Check if we have the data texture
+      if (this.textures.exists('data')) {
+        // Create collectible sprite directly
+        const collectible = this.physics.add.sprite(laneX, collectibleY, 'data');
+        collectible.setDisplaySize(24, 24);
+        collectible.setTint(0x38bdf8);
+        
+        // Set physics properties
+        collectible.body.allowGravity = false;
+        
+        // Add pulsing effect
+        this.tweens.add({
+          targets: collectible,
+          scale: { from: 1, to: 1.2 },
+          duration: 500,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.easeInOut'
+        });
+        
+        this.collectibles.add(collectible);
+        console.log('Collectible spawned in lane', lane);
+      } else {
+        // Use rectangle as fallback
+        const rectCollectible = this.physics.add.rectangle(
+          laneX,
+          collectibleY,
+          24,
+          24,
+          0x38bdf8
+        );
+        
+        rectCollectible.body.allowGravity = false;
+        
+        this.collectibles.add(rectCollectible);
+      }
     } catch (e) {
       console.error('Error spawning collectible:', e);
-      
-      // Create fallback collectible
-      try {
-        const y = Phaser.Math.Between(
-          this.groundY - 200, 
-          this.groundY - 50
-        );
-        
-        const fallbackCollectible = this.physics.add.sprite(
-          this.cameras.main.width + 100,
-          y,
-          'data'
-        );
-        
-        fallbackCollectible.setDisplaySize(24, 24);
-        fallbackCollectible.setTint(0x38bdf8);
-        fallbackCollectible.setVelocityX(-this.gameSpeed);
-        fallbackCollectible.body.allowGravity = false;
-        
-        this.collectibles.add(fallbackCollectible);
-        console.log('Fallback collectible spawned');
-      } catch (innerE) {
-        console.error('Failed to create fallback collectible:', innerE);
-      }
     }
   }
   
@@ -517,7 +677,7 @@ export class MainScene extends Phaser.Scene {
     
     try {
       // Play sound with safety check
-      if (this.sound.get('collect')) {
+      if (this.sound && this.sound.get && this.sound.get('collect')) {
         this.sound.play('collect', { volume: 0.5 });
       }
       
@@ -571,26 +731,15 @@ export class MainScene extends Phaser.Scene {
       this.isGameOver = true;
       
       // Play sound with safety check
-      if (this.sound.get('hit')) {
-        this.sound.play('hit', { volume: 0.7 });
+      if (this.sound && this.sound.get) {
+        if (this.sound.get('hit')) {
+          this.sound.play('hit', { volume: 0.7 });
+        }
+        
+        if (this.sound.get('gameover')) {
+          this.sound.play('gameover', { volume: 0.5, delay: 0.5 });
+        }
       }
-      
-      if (this.sound.get('gameover')) {
-        this.sound.play('gameover', { volume: 0.5, delay: 0.5 });
-      }
-      
-      // Stop player and obstacles
-      if (this.player && this.player.body) {
-        this.player.body.setVelocity(0, 0);
-      }
-      
-      this.obstacles.getChildren().forEach(obs => {
-        obs.setVelocity(0, 0);
-      });
-      
-      this.collectibles.getChildren().forEach(col => {
-        col.setVelocity(0, 0);
-      });
       
       // Flash player
       this.tweens.add({
@@ -661,15 +810,6 @@ export class MainScene extends Phaser.Scene {
       // Gradually increase game speed
       this.gameSpeed += 10;
       console.log('Game speed increased to:', this.gameSpeed);
-      
-      // Update obstacle and collectible speeds
-      this.obstacles.getChildren().forEach(obstacle => {
-        obstacle.setVelocityX(-this.gameSpeed);
-      });
-      
-      this.collectibles.getChildren().forEach(collectible => {
-        collectible.setVelocityX(-this.gameSpeed);
-      });
       
       // Update difficulty text if needed
       if (this.difficultyText && this.gameSpeed > this.difficulties.hard.speed) {

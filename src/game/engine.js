@@ -4,7 +4,7 @@ import { GameOverScene } from './scenes/gameOverScene';
 
 // Game configuration
 const gameConfig = {
-  type: Phaser.AUTO,
+  type: Phaser.AUTO, // Try Phaser.CANVAS if WebGL is causing issues
   width: 800,
   height: 400,
   parent: 'game-container',
@@ -23,6 +23,15 @@ const gameConfig = {
   render: {
     pixelArt: false,
     antialias: true
+  },
+  // Add these callbacks to see if Phaser is initializing correctly
+  callbacks: {
+    preBoot: function (game) {
+      console.log('Phaser preBoot');
+    },
+    postBoot: function (game) {
+      console.log('Phaser postBoot');
+    }
   }
 };
 
@@ -51,7 +60,10 @@ export class GameEngine {
   
   // Initialize game
   init() {
+    console.log('Initializing game engine');
+    
     if (this.game) {
+      console.log('Game already initialized, returning');
       return;
     }
     
@@ -61,29 +73,44 @@ export class GameEngine {
       parent: this.containerId
     };
     
-    // Create new Phaser game
-    this.game = new Phaser.Game(config);
+    // Log the container and check if it exists
+    console.log('Game container:', this.containerId);
+    const containerElement = document.getElementById(this.containerId);
+    console.log('Container element exists:', !!containerElement);
     
-    // Add scenes
-    this.game.scene.add('MainScene', MainScene);
-    this.game.scene.add('GameOverScene', GameOverScene);
-    
-    // Listen for score updates
-    this.game.events.on('updateScore', this.handleScoreUpdate, this);
-    
-    // Listen for game over
-    this.game.events.on('gameOver', this.handleGameOver, this);
-    
-    // Listen for leaderboard view
-    this.game.events.on('viewLeaderboard', this.handleViewLeaderboard, this);
-    
-    // Start with main scene
-    this.game.scene.start('MainScene', { difficulty: this.difficulty });
+    try {
+      // Create new Phaser game
+      console.log('Creating new Phaser game with config:', config);
+      this.game = new Phaser.Game(config);
+      
+      // Add scenes
+      this.game.scene.add('MainScene', MainScene);
+      this.game.scene.add('GameOverScene', GameOverScene);
+      
+      // Listen for score updates
+      this.game.events.on('updateScore', this.handleScoreUpdate, this);
+      
+      // Listen for game over
+      this.game.events.on('gameOver', this.handleGameOver, this);
+      
+      // Listen for leaderboard view
+      this.game.events.on('viewLeaderboard', this.handleViewLeaderboard, this);
+      
+      // Start with main scene
+      this.game.scene.start('MainScene', { difficulty: this.difficulty });
+      
+      console.log('Game initialization complete');
+    } catch (error) {
+      console.error('Error initializing game:', error);
+    }
   }
   
   // Start game
   start(difficulty = 'normal') {
+    console.log('Starting game with difficulty:', difficulty);
+    
     if (!this.game) {
+      console.log('Game not initialized, initializing now');
       this.init();
     }
     
@@ -93,13 +120,20 @@ export class GameEngine {
     
     // Start main scene with difficulty
     this.game.scene.start('MainScene', { difficulty });
+    
+    console.log('Game started');
   }
   
   // Stop game
   stop() {
+    console.log('Stopping game');
+    
     if (this.game && this.isRunning) {
       this.isRunning = false;
       this.game.scene.stop('MainScene');
+      console.log('Game stopped');
+    } else {
+      console.log('Game not running, nothing to stop');
     }
   }
   
@@ -115,11 +149,16 @@ export class GameEngine {
   
   // Handle game over
   handleGameOver(finalScore) {
+    console.log('Game over handler called with score:', finalScore);
+    
     this.isRunning = false;
     
     // Call external game over callback if provided
     if (this.gameOverCallback) {
+      console.log('Calling game over callback');
       this.gameOverCallback(finalScore);
+    } else {
+      console.log('No game over callback provided');
     }
   }
   
@@ -158,12 +197,23 @@ export class GameEngine {
   
   // Destroy game instance
   destroy() {
+    console.log('Destroying game instance');
+    
     if (this.game) {
       this.game.events.off('updateScore');
       this.game.events.off('gameOver');
       this.game.events.off('viewLeaderboard');
-      this.game.destroy(true);
-      this.game = null;
+      
+      try {
+        // Try to destroy the Phaser game
+        this.game.destroy(true);
+        this.game = null;
+        console.log('Game instance destroyed');
+      } catch (error) {
+        console.error('Error destroying game:', error);
+      }
+    } else {
+      console.log('No game instance to destroy');
     }
   }
 }
