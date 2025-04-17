@@ -6,9 +6,10 @@ export class Collectible {
     this.z = z || 1000; // Z-distance (depth)
     this.lane = lane || 0.5; // Lane position (0-1)
     
-    // Base properties (full size when at player position)
-    this.baseWidth = 20;
-    this.baseHeight = 20;
+    // Base properties - 4x larger than original
+    this.baseWidth = 80;
+    this.baseHeight = 80;
+    this.glowSize = 120;
     
     // Create sprite
     if (scene.textures.exists('data')) {
@@ -16,7 +17,7 @@ export class Collectible {
       this.sprite.setTint(0x38bdf8); // Blue tint
     } else {
       // Fallback to rectangle
-      this.sprite = scene.add.rectangle(x, y, 8, 8, 0x38bdf8);
+      this.sprite = scene.add.rectangle(x, y, 32, 32, 0x38bdf8);
     }
     
     // Set depth to ensure proper rendering order
@@ -56,8 +57,8 @@ export class Collectible {
       const glow = this.scene.add.ellipse(
         this.sprite.x,
         this.sprite.y,
-        30,
-        30,
+        this.glowSize,
+        this.glowSize,
         0x38bdf8,
         0.3
       );

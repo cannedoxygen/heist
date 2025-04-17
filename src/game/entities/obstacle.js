@@ -6,9 +6,10 @@ export class Obstacle {
     this.z = z || 1000; // Z-distance (depth)
     this.lane = lane || 0.5; // Lane position (0-1)
     
-    // Base properties (full size when at player position)
-    this.baseWidth = 60;
-    this.baseHeight = 40;
+    // Base properties - 4x larger than original
+    this.baseWidth = 240;
+    this.baseHeight = 160;
+    this.jitterRange = 20; // For glitch effect
     
     // Create sprite
     if (scene.textures.exists('obstacle')) {
@@ -16,7 +17,7 @@ export class Obstacle {
       this.sprite.setTint(0xef4444); // Red tint
     } else {
       // Fallback to rectangle
-      this.sprite = scene.add.rectangle(x, y, 10, 5, 0xef4444);
+      this.sprite = scene.add.rectangle(x, y, 40, 20, 0xef4444);
     }
     
     // Set depth to ensure proper rendering order
@@ -54,8 +55,8 @@ export class Obstacle {
           // Random position jitter
           const origX = this.sprite.x;
           const origY = this.sprite.y;
-          this.sprite.x += Math.floor(Math.random() * 10) - 5; // Random between -5 and 5
-          this.sprite.y += Math.floor(Math.random() * 10) - 5; // Random between -5 and 5
+          this.sprite.x += Math.floor(Math.random() * this.jitterRange * 2) - this.jitterRange;
+          this.sprite.y += Math.floor(Math.random() * this.jitterRange * 2) - this.jitterRange;
           this.scene.time.delayedCall(100, () => {
             this.sprite.x = origX;
             this.sprite.y = origY;

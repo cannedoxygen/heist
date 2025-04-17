@@ -211,7 +211,9 @@ export class MainScene extends Phaser.Scene {
     if (this.isGameOver) return;
     
     // Update the Tron grid
-    this.tronGrid.update(delta);
+    if (this.tronGrid) {
+      this.tronGrid.update(delta);
+    }
     
     // Update player glow position
     if (this.playerGlow && this.player) {
@@ -220,9 +222,9 @@ export class MainScene extends Phaser.Scene {
     }
     
     // Handle keyboard input
-    if (Phaser.Input.Keyboard.JustDown(this.cursors.left)) {
+    if (this.cursors && Phaser.Input.Keyboard.JustDown(this.cursors.left)) {
       this.moveLeft();
-    } else if (Phaser.Input.Keyboard.JustDown(this.cursors.right)) {
+    } else if (this.cursors && Phaser.Input.Keyboard.JustDown(this.cursors.right)) {
       this.moveRight();
     }
     
@@ -240,56 +242,67 @@ export class MainScene extends Phaser.Scene {
     }
     
     // Filter out collected objects from our processing arrays
-    this.objectsPool = this.objectsPool.filter(obj => {
-      // If this is a collected object, destroy its sprite and remove from pool
-      if (obj.type === 'collectible' && obj.collected) {
-        return false; // remove from pool
-      }
-      
-      // Update z position (moving closer to the camera)
-      obj.z -= this.gameSpeed * (delta / 16.667);
-      
-      // If object has passed the camera, destroy and remove
-      if (obj.z <= 0) {
-        if (obj.sprite) {
-          obj.sprite.destroy();
-        }
-        return false; // remove from pool
-      }
-      
-      // Update visual properties based on z-distance
-      this.updateObjectVisuals(obj);
-      
-      // Check for collisions with player
-      if (obj.z < 50 && obj.z > 30) {
-        // Calculate lane of object
-        const objLaneIndex = Math.round(obj.lane * (this.lanes.length - 1));
+    if (Array.isArray(this.objectsPool)) {
+      this.objectsPool = this.objectsPool.filter(obj => {
+        // Skip undefined objects
+        if (!obj) return false;
         
-        if (objLaneIndex === this.currentLane) {
-          if (obj.type === 'collectible' && !obj.collected) {
-            // Collect data
-            this.collectData(obj);
-            // Don't remove from array yet, just mark as collected
-          } else if (obj.type === 'obstacle' && !this.player.isJumping && !obj.hit) {
-            // Hit obstacle - only if not already hit
-            this.hitObstacle(obj);
+        // If this is a collected object, destroy its sprite and remove from pool
+        if (obj.type === 'collectible' && obj.collected) {
+          return false; // remove from pool
+        }
+        
+        // Update z position (moving closer to the camera)
+        obj.z -= this.gameSpeed * (delta / 16.667);
+        
+        // If object has passed the camera, destroy and remove
+        if (obj.z <= 0) {
+          if (obj.sprite) {
+            obj.sprite.destroy();
+          }
+          return false; // remove from pool
+        }
+        
+        // Update visual properties based on z-distance
+        this.updateObjectVisuals(obj);
+        
+        // Check for collisions with player
+        if (obj.z < 50 && obj.z > 30) {
+          // Calculate lane of object
+          const objLaneIndex = Math.round(obj.lane * (this.lanes.length - 1));
+          
+          if (objLaneIndex === this.currentLane) {
+            if (obj.type === 'collectible' && !obj.collected) {
+              // Collect data
+              this.collectData(obj);
+              // Don't remove from array yet, just mark as collected
+            } else if (obj.type === 'obstacle' && this.player && !this.player.isJumping && !obj.hit) {
+              // Hit obstacle - only if not already hit
+              this.hitObstacle(obj);
+            }
           }
         }
-      }
-      
-      return true; // keep in pool
-    });
+        
+        return true; // keep in pool
+      });
+    }
   }
   
   createFallbackAssets() {
+    // Define sizes for fallback textures
+    const playerSize = 160;
+    const obstacleWidth = 240;
+    const obstacleHeight = 160;
+    const collectibleSize = 80;
+  
     // Create fallback textures if needed
     try {
       if (!this.textures.exists('player')) {
         console.log('Creating fallback player texture');
         const graphics = this.make.graphics({ x: 0, y: 0, add: false });
         graphics.fillStyle(0x4f46e5, 1);
-        graphics.fillRect(0, 0, 30, 30);
-        graphics.generateTexture('player', 30, 30);
+        graphics.fillRect(0, 0, playerSize, playerSize);
+        graphics.generateTexture('player', playerSize, playerSize);
         graphics.destroy();
       }
     } catch (e) {
@@ -301,8 +314,8 @@ export class MainScene extends Phaser.Scene {
         console.log('Creating fallback obstacle texture');
         const graphics = this.make.graphics({ x: 0, y: 0, add: false });
         graphics.fillStyle(0xef4444, 1);
-        graphics.fillRect(0, 0, 60, 40);
-        graphics.generateTexture('obstacle', 60, 40);
+        graphics.fillRect(0, 0, obstacleWidth, obstacleHeight);
+        graphics.generateTexture('obstacle', obstacleWidth, obstacleHeight);
         graphics.destroy();
       }
     } catch (e) {
@@ -314,8 +327,8 @@ export class MainScene extends Phaser.Scene {
         console.log('Creating fallback data texture');
         const graphics = this.make.graphics({ x: 0, y: 0, add: false });
         graphics.fillStyle(0x38bdf8, 1);
-        graphics.fillRect(0, 0, 20, 20);
-        graphics.generateTexture('data', 20, 20);
+        graphics.fillRect(0, 0, collectibleSize, collectibleSize);
+        graphics.generateTexture('data', collectibleSize, collectibleSize);
         graphics.destroy();
       }
     } catch (e) {
@@ -331,9 +344,9 @@ export class MainScene extends Phaser.Scene {
     // If player texture exists, use it; otherwise create a simple sprite
     if (this.textures.exists('player')) {
       this.player = this.add.sprite(playerX, playerY, 'player');
-      this.player.setDisplaySize(70, 70);
+      this.player.setDisplaySize(280, 280);
     } else {
-      this.player = this.add.rectangle(playerX, playerY, 70, 70, 0x4f46e5);
+      this.player = this.add.rectangle(playerX, playerY, 280, 280, 0x4f46e5);
     }
     
     // Set player properties
@@ -346,8 +359,8 @@ export class MainScene extends Phaser.Scene {
     this.playerGlow = this.add.ellipse(
       playerX,
       playerY + 20,
-      90,
-      30,
+      360,
+      120,
       0x4f46e5,
       0.4
     );
@@ -387,7 +400,9 @@ export class MainScene extends Phaser.Scene {
       ease: 'Sine.easeOut',
       yoyo: true,
       onComplete: () => {
-        this.player.isJumping = false;
+        if (this.player) {
+          this.player.isJumping = false;
+        }
       }
     });
     
@@ -407,12 +422,14 @@ export class MainScene extends Phaser.Scene {
   }
   
   createJumpEffect() {
+    if (!this.player) return;
+    
     // Create a visual jump effect
     const jumpEffect = this.add.ellipse(
       this.player.x,
       this.player.y + 35,
+      320,
       80,
-      20,
       0x4f46e5,
       0.6
     );
@@ -452,7 +469,7 @@ export class MainScene extends Phaser.Scene {
   }
   
   movePlayerToLane(laneIndex) {
-    if (!this.player) return;
+    if (!this.player || !this.tronGrid) return;
     
     // Safety check for laneIndex
     if (laneIndex < 0 || laneIndex >= this.lanes.length) {
@@ -480,9 +497,11 @@ export class MainScene extends Phaser.Scene {
     }
     
     // Clear any existing movement tweens
-    this.tweens.killTweensOf(this.player);
-    if (this.playerGlow) {
-      this.tweens.killTweensOf(this.playerGlow);
+    if (this.tweens) {
+      this.tweens.killTweensOf(this.player);
+      if (this.playerGlow) {
+        this.tweens.killTweensOf(this.playerGlow);
+      }
     }
     
     // Create tween to move player
@@ -513,6 +532,8 @@ export class MainScene extends Phaser.Scene {
   }
   
   spawnObstacleAtDistance(z) {
+    if (!this.tronGrid) return;
+    
     // Pick a random lane index
     const laneIndex = Math.floor(Math.random() * this.lanes.length);
     
@@ -551,12 +572,14 @@ export class MainScene extends Phaser.Scene {
       sprite: sprite,
       lane: laneIndex / (this.lanes.length - 1), // Normalize to 0-1
       z: z,
-      baseWidth: 80,
-      baseHeight: 60,
+      baseWidth: 320,
+      baseHeight: 240,
       hit: false
     };
     
-    this.objectsPool.push(obstacle);
+    if (Array.isArray(this.objectsPool)) {
+      this.objectsPool.push(obstacle);
+    }
     
     // Initial size update
     this.updateObjectVisuals(obstacle);
@@ -568,6 +591,8 @@ export class MainScene extends Phaser.Scene {
   }
   
   spawnCollectibleAtDistance(z) {
+    if (!this.tronGrid) return;
+    
     // Pick a random lane index
     const laneIndex = Math.floor(Math.random() * this.lanes.length);
     
@@ -616,18 +641,22 @@ export class MainScene extends Phaser.Scene {
       sprite: sprite,
       lane: laneIndex / (this.lanes.length - 1), // Normalize to 0-1
       z: z,
-      baseWidth: 30,
-      baseHeight: 30,
+      baseWidth: 120,
+      baseHeight: 120,
       collected: false
     };
     
-    this.objectsPool.push(collectible);
+    if (Array.isArray(this.objectsPool)) {
+      this.objectsPool.push(collectible);
+    }
     
     // Initial size update
     this.updateObjectVisuals(collectible);
   }
   
   updateObjectVisuals(obj) {
+    if (!obj || !obj.sprite || !this.tronGrid) return;
+    
     // Skip if this object has been collected
     if ((obj.type === 'collectible' && obj.collected) || 
         (obj.sprite && !obj.sprite.visible)) {
@@ -659,7 +688,7 @@ export class MainScene extends Phaser.Scene {
     obj.sprite.y = y;
     
     // Update sprite size based on distance
-    const scale = ratio * 2.0; // Boosted scaling factor for better visibility
+    const scale = ratio * 3.0;
     obj.sprite.displayWidth = obj.baseWidth * scale;
     obj.sprite.displayHeight = obj.baseHeight * scale;
     
@@ -668,6 +697,8 @@ export class MainScene extends Phaser.Scene {
   }
   
   collectData(obj) {
+    if (!obj || !obj.sprite) return;
+    
     // Immediately prevent any duplicate collection
     if (obj.collected) return;
     
@@ -681,7 +712,9 @@ export class MainScene extends Phaser.Scene {
     
     // Update score
     this.score += 10;
-    this.scoreText.setText(`SCORE: ${this.score}`);
+    if (this.scoreText) {
+      this.scoreText.setText(`SCORE: ${this.score}`);
+    }
     
     // Hide the sprite immediately to prevent visual glitches
     obj.sprite.visible = false;
@@ -690,25 +723,27 @@ export class MainScene extends Phaser.Scene {
     this.createCollectParticles(obj.sprite.x, obj.sprite.y);
     
     // Visual feedback on score
-    this.tweens.add({
-      targets: this.scoreText,
-      scale: { from: 1.2, to: 1 },
-      duration: 200,
-      ease: 'Sine.easeOut'
-    });
+    if (this.scoreText) {
+      this.tweens.add({
+        targets: this.scoreText,
+        scale: { from: 1.2, to: 1 },
+        duration: 200,
+        ease: 'Sine.easeOut'
+      });
+    }
   }
   
   createCollectParticles(x, y) {
     // Create simple particle effect for data collection
-    for (let i = 0; i < 15; i++) {
-      const particle = this.add.circle(x, y, 5, 0x38bdf8);
+    for (let i = 0; i < 30; i++) {
+      const particle = this.add.circle(x, y, 20, 0x38bdf8);
       particle.setAlpha(0.7);
       particle.setDepth(40);
       
       this.tweens.add({
         targets: particle,
-        x: x + Math.floor(Math.random() * 100) - 50,
-        y: y + Math.floor(Math.random() * 100) - 50,
+        x: x + Math.floor(Math.random() * 200) - 100,
+        y: y + Math.floor(Math.random() * 200) - 100,
         alpha: 0,
         scale: 0,
         duration: 500,
@@ -721,7 +756,7 @@ export class MainScene extends Phaser.Scene {
     // Add floating score text
     const scorePopup = this.add.text(x, y - 20, '+10', {
       fontFamily: 'Orbitron, sans-serif',
-      fontSize: '20px',
+      fontSize: '40px',
       color: '#38bdf8'
     }).setOrigin(0.5);
     scorePopup.setDepth(45);
@@ -729,7 +764,7 @@ export class MainScene extends Phaser.Scene {
     // Animate score popup
     this.tweens.add({
       targets: scorePopup,
-      y: y - 50,
+      y: y - 120,
       alpha: 0,
       duration: 800,
       onComplete: () => {
@@ -739,7 +774,7 @@ export class MainScene extends Phaser.Scene {
   }
   
   hitObstacle(obj) {
-    if (this.isGameOver) return;
+    if (this.isGameOver || !obj || !obj.sprite) return;
     
     console.log("Hit obstacle");
     
@@ -758,13 +793,15 @@ export class MainScene extends Phaser.Scene {
     }
     
     // Flash player
-    this.tweens.add({
-      targets: this.player,
-      alpha: 0,
-      duration: 100,
-      yoyo: true,
-      repeat: 5
-    });
+    if (this.player) {
+      this.tweens.add({
+        targets: this.player,
+        alpha: 0,
+        duration: 100,
+        yoyo: true,
+        repeat: 5
+      });
+    }
     
     // Create crash effect
     this.createCrashEffect(obj.sprite.x, obj.sprite.y);
@@ -842,14 +879,14 @@ export class MainScene extends Phaser.Scene {
   
   createCrashEffect(x, y) {
     // Create explosion particles
-    for (let i = 0; i < 30; i++) {
-      const particle = this.add.circle(x, y, Math.floor(Math.random() * 5) + 3, 0xef4444);
+    for (let i = 0; i < 50; i++) {
+      const particle = this.add.circle(x, y, Math.floor(Math.random() * 20) + 12, 0xef4444);
       particle.setDepth(60);
       
       this.tweens.add({
         targets: particle,
-        x: x + Math.floor(Math.random() * 200) - 100,
-        y: y + Math.floor(Math.random() * 200) - 100,
+        x: x + Math.floor(Math.random() * 400) - 200,
+        y: y + Math.floor(Math.random() * 400) - 200,
         alpha: 0,
         scale: { from: 1, to: 0 },
         duration: Math.floor(Math.random() * 500) + 500,
@@ -860,7 +897,7 @@ export class MainScene extends Phaser.Scene {
     }
     
     // Add explosion effect
-    const explosion = this.add.circle(x, y, 40, 0xef4444, 0.7);
+    const explosion = this.add.circle(x, y, 160, 0xef4444, 0.7);
     explosion.setDepth(55);
     
     this.tweens.add({

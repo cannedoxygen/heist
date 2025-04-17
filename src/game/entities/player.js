@@ -4,12 +4,21 @@ export class Player {
   constructor(scene, x, y) {
     this.scene = scene;
     
+    // Player dimensions - 4x larger than original
+    this.width = 160;
+    this.height = 160;
+    this.glowWidth = 240;
+    this.glowHeight = 80;
+    this.jumpEffectWidth = 320;
+    this.jumpEffectHeight = 80;
+    
     // Create sprite
     if (scene.textures.exists('player')) {
       this.sprite = scene.add.sprite(x, y, 'player');
+      this.sprite.setDisplaySize(this.width, this.height);
     } else {
       // Fallback to rectangle if texture doesn't exist
-      this.sprite = scene.add.rectangle(x, y, 40, 40, 0x4f46e5);
+      this.sprite = scene.add.rectangle(x, y, this.width, this.height, 0x4f46e5);
     }
     
     // Set sprite properties
@@ -68,8 +77,8 @@ export class Player {
       const particle = this.scene.add.rectangle(
         this.sprite.x,
         this.sprite.y + 10,
-        10,
-        10,
+        40,
+        40,
         0x4f46e5,
         0.3
       );
@@ -96,8 +105,8 @@ export class Player {
       this.glow = this.scene.add.ellipse(
         this.sprite.x,
         this.sprite.y + 15,
-        60,
-        20,
+        this.glowWidth,
+        this.glowHeight,
         0x4f46e5,
         0.3
       );
@@ -147,32 +156,42 @@ export class Player {
       }
     });
     
-    // Add shadow effect during jump
-    this.createJumpShadow();
+    // Move glow with jump
+    if (this.glow) {
+      this.scene.tweens.add({
+        targets: this.glow,
+        y: this.glow.y - this.jumpHeight,
+        duration: this.jumpDuration / 2,
+        ease: 'Sine.easeOut',
+        yoyo: true
+      });
+    }
+    
+    // Create jump effect
+    this.createJumpEffect();
   }
   
-  createJumpShadow() {
-    // Create a shadow underneath during jump
-    const shadow = this.scene.add.ellipse(
+  createJumpEffect() {
+    // Create a jump shadow effect
+    const jumpEffect = this.scene.add.ellipse(
       this.sprite.x,
-      this.sprite.y + 20,
-      30,
-      10,
-      0x000000,
-      0.3
+      this.sprite.y + 35,
+      this.jumpEffectWidth,
+      this.jumpEffectHeight,
+      0x4f46e5,
+      0.6
     );
-    shadow.setDepth(20);
+    jumpEffect.setDepth(40);
     
-    // Fade out shadow as player goes higher
+    // Animate the jump effect
     this.scene.tweens.add({
-      targets: shadow,
-      scaleX: 0.5,
+      targets: jumpEffect,
+      scaleX: 1.5,
       scaleY: 0.5,
-      alpha: 0.1,
-      duration: this.jumpDuration / 2,
-      yoyo: true,
+      alpha: 0,
+      duration: 300,
       onComplete: () => {
-        shadow.destroy();
+        jumpEffect.destroy();
       }
     });
   }
@@ -188,6 +207,16 @@ export class Player {
       duration: 200,
       ease: 'Sine.easeInOut'
     });
+    
+    // Move glow with player
+    if (this.glow) {
+      this.scene.tweens.add({
+        targets: this.glow,
+        x: laneX,
+        duration: 200,
+        ease: 'Sine.easeInOut'
+      });
+    }
   }
   
   update() {
