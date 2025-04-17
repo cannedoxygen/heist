@@ -1,61 +1,78 @@
 import Phaser from 'phaser';
 
-export class Obstacle extends Phaser.Physics.Arcade.Sprite {
-  constructor(scene, x, y, speed) {
-    super(scene, x, y, 'obstacle');
+export class Obstacle {
+  constructor(scene, x, y, z, lane) {
+    this.scene = scene;
+    this.z = z || 1000; // Z-distance (depth)
+    this.lane = lane || 0.5; // Lane position (0-1)
     
-    // Add to scene
-    scene.add.existing(this);
-    scene.physics.add.existing(this);
+    // Base properties (full size when at player position)
+    this.baseWidth = 60;
+    this.baseHeight = 40;
     
-    // Physics properties
-    this.setImmovable(true);
-    this.body.allowGravity = false;
-    this.setVelocityX(-speed);
-    
-    // Random width (for variety)
-    const width = Phaser.Math.Between(30, 80);
-    const height = Phaser.Math.Between(20, 40);
-    
-    // Visual properties
-    this.setScale(1);
-    
-    // If using a placeholder rectangle instead of a sprite
-    if (!scene.textures.exists('obstacle')) {
-      this.setDisplaySize(width, height);
-      this.setTint(0xef4444); // Red tint
+    // Create sprite
+    if (scene.textures.exists('obstacle')) {
+      this.sprite = scene.add.sprite(x, y, 'obstacle');
+      this.sprite.setTint(0xef4444); // Red tint
+    } else {
+      // Fallback to rectangle
+      this.sprite = scene.add.rectangle(x, y, 10, 5, 0xef4444);
     }
     
-    // Add glow effect
-    this.createGlow();
+    // Set depth to ensure proper rendering order
+    this.sprite.setDepth(30);
+    
+    // Add to scene's object pool
+    if (scene.objectsPool) {
+      scene.objectsPool.push({
+        type: 'obstacle',
+        sprite: this.sprite,
+        lane: this.lane,
+        z: this.z,
+        baseWidth: this.baseWidth,
+        baseHeight: this.baseHeight,
+        hit: false
+      });
+    }
+    
+    // Add effects
+    this.addGlitchEffect();
   }
   
-  createGlow() {
-    // Create glow effect using a light
-    if (this.scene.lights && this.scene.lights.active) {
-      const light = this.scene.lights.addLight(this.x, this.y, 128).setColor(0xef4444).setIntensity(2);
-      
-      // Update light position to follow obstacle
-      this.scene.events.on('update', () => {
-        light.x = this.x;
-        light.y = this.y;
-      });
-      
-      // Remove light when obstacle is destroyed
-      this.on('destroy', () => {
-        light.setIntensity(0);
-        this.scene.lights.removeLight(light);
-      });
-    }
+  addGlitchEffect() {
+    // Random glitch effect
+    this.scene.time.addEvent({
+      delay: Math.floor(Math.random() * 2000) + 1000, // Random delay between 1-3 seconds
+      callback: () => {
+        if (Math.random() > 0.7) {
+          // Flash the obstacle
+          this.sprite.setAlpha(0.5);
+          this.scene.time.delayedCall(100, () => {
+            this.sprite.setAlpha(1);
+          });
+          
+          // Random position jitter
+          const origX = this.sprite.x;
+          const origY = this.sprite.y;
+          this.sprite.x += Math.floor(Math.random() * 10) - 5; // Random between -5 and 5
+          this.sprite.y += Math.floor(Math.random() * 10) - 5; // Random between -5 and 5
+          this.scene.time.delayedCall(100, () => {
+            this.sprite.x = origX;
+            this.sprite.y = origY;
+          });
+        }
+      },
+      callbackScope: this,
+      loop: true
+    });
   }
   
   update() {
-    // Optional: Add random glitching effect for corrupted data aesthetic
-    if (Math.random() > 0.95) {
-      this.setAlpha(0.5);
-      this.scene.time.delayedCall(50, () => {
-        this.setAlpha(1);
-      });
-    }
+    // This method is not used in the 3D perspective system
+    // Updates are handled by the main scene
+  }
+  
+  destroy() {
+    this.sprite.destroy();
   }
 }

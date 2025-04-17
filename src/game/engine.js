@@ -4,10 +4,9 @@ import { GameOverScene } from './scenes/gameOverScene';
 
 // Game configuration
 const gameConfig = {
-  type: Phaser.AUTO, // Try Phaser.CANVAS if WebGL is causing issues
+  type: Phaser.AUTO,
   width: 800,
   height: 400,
-  parent: 'game-container',
   backgroundColor: '#0a0e17',
   physics: {
     default: 'arcade',
@@ -23,15 +22,6 @@ const gameConfig = {
   render: {
     pixelArt: false,
     antialias: true
-  },
-  // Add these callbacks to see if Phaser is initializing correctly
-  callbacks: {
-    preBoot: function (game) {
-      console.log('Phaser preBoot');
-    },
-    postBoot: function (game) {
-      console.log('Phaser postBoot');
-    }
   }
 };
 
@@ -80,7 +70,7 @@ export class GameEngine {
     
     try {
       // Create new Phaser game
-      console.log('Creating new Phaser game with config:', config);
+      console.log('Creating new Phaser game');
       this.game = new Phaser.Game(config);
       
       // Add scenes
@@ -92,9 +82,6 @@ export class GameEngine {
       
       // Listen for game over
       this.game.events.on('gameOver', this.handleGameOver, this);
-      
-      // Listen for leaderboard view
-      this.game.events.on('viewLeaderboard', this.handleViewLeaderboard, this);
       
       // Start with main scene
       this.game.scene.start('MainScene', { difficulty: this.difficulty });
@@ -162,14 +149,6 @@ export class GameEngine {
     }
   }
   
-  // Handle view leaderboard request
-  handleViewLeaderboard() {
-    // This will be handled by React router
-    if (window.location) {
-      window.location.href = '/leaderboard';
-    }
-  }
-  
   // Set game volume
   setVolume(volume) {
     this.volume = volume;
@@ -202,7 +181,6 @@ export class GameEngine {
     if (this.game) {
       this.game.events.off('updateScore');
       this.game.events.off('gameOver');
-      this.game.events.off('viewLeaderboard');
       
       try {
         // Try to destroy the Phaser game

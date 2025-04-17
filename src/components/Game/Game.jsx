@@ -1,58 +1,114 @@
-import React, { useContext, useEffect } from 'react';
+import React, { useEffect, useRef, useContext } from 'react';
 import { GameContext } from '../../context/GameContext';
-import GameOver from './GameOver';
-import GameCanvas from './GameCanvas';
+import { GameEngine } from '../../game/engine';
 import './Game.css';
 
-// This component will integrate with Phaser for game rendering
 const Game = () => {
   const { 
-    isPlaying, 
-    score, 
-    gameOver, 
-    difficulty 
+    updateScore, 
+    endGame,
+    isPlaying,
+    volume,
+    isMuted
   } = useContext(GameContext);
   
-  // Debug logging
+  const gameContainerRef = useRef(null);
+  const gameEngineRef = useRef(null);
+  
+  // Initialize game engine
   useEffect(() => {
-    console.log("Game component rendered with state:", {
-      isPlaying,
-      score,
-      gameOver,
-      difficulty
-    });
-  }, [isPlaying, score, gameOver, difficulty]);
+    console.log("Game component mounted");
+    
+    // Initialize game engine
+    const handleScoreUpdate = (score) => {
+      console.log("Score update:", score);
+      updateScore(score);
+    };
+    
+    const handleGameOver = (finalScore) => {
+      console.log("Game over with score:", finalScore);
+      endGame(finalScore);
+    };
+    
+    // Create game instance
+    gameEngineRef.current = new GameEngine(
+      'game-container',
+      handleScoreUpdate,
+      handleGameOver
+    );
+    
+    // Initialize on a short delay to ensure DOM is ready
+    setTimeout(() => {
+      try {
+        gameEngineRef.current.init();
+        console.log("Game engine initialized");
+      } catch (error) {
+        console.error("Error initializing game:", error);
+      }
+    }, 100);
+    
+    // Cleanup on unmount
+    return () => {
+      console.log("Game component unmounting");
+      if (gameEngineRef.current) {
+        gameEngineRef.current.destroy();
+      }
+    };
+  }, [updateScore, endGame]);
   
-  // Render game over screen if game is over
-  if (gameOver) {
-    console.log("Rendering GameOver component");
-    return <GameOver score={score} />;
-  }
+  // Handle play state changes
+  useEffect(() => {
+    console.log("Play state changed:", isPlaying);
+    
+    if (gameEngineRef.current) {
+      if (isPlaying) {
+        gameEngineRef.current.start();
+      } else {
+        gameEngineRef.current.stop();
+      }
+    }
+  }, [isPlaying]);
   
-  // Render game canvas
+  // Handle volume changes
+  useEffect(() => {
+    console.log("Volume changed:", volume);
+    
+    if (gameEngineRef.current) {
+      gameEngineRef.current.setVolume(volume);
+    }
+  }, [volume]);
+  
+  // Handle mute state changes
+  useEffect(() => {
+    console.log("Mute state changed:", isMuted);
+    
+    if (gameEngineRef.current) {
+      gameEngineRef.current.toggleMute();
+    }
+  }, [isMuted]);
+  
+  // Handle window resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (gameEngineRef.current) {
+        gameEngineRef.current.resize();
+      }
+    };
+    
+    window.addEventListener('resize', handleResize);
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+  
   return (
     <div className="game-container">
-      <div className="game-hud">
-        <div className="game-score">
-          <span className="game-score__label">SCORE</span>
-          <span className="game-score__value">{score}</span>
-        </div>
-        
-        <div className="game-difficulty">
-          <span className="game-difficulty__label">LEVEL</span>
-          <span className="game-difficulty__value">{difficulty.toUpperCase()}</span>
-        </div>
-      </div>
-      
-      {/* Use GameCanvas component to render the Phaser game */}
-      <GameCanvas />
-      
-      {/* Overlay if not playing yet */}
-      {!isPlaying && !gameOver && (
-        <div className="game-waiting">
-          <p>Connect wallet and press START to play</p>
-        </div>
-      )}
+      <div 
+        id="game-container" 
+        ref={gameContainerRef} 
+        className="game-canvas"
+      ></div>
     </div>
   );
 };

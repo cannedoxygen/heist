@@ -1,7 +1,5 @@
 import Phaser from 'phaser';
-import { Player } from '../entities/player';
-import { Obstacle } from '../entities/obstacle';
-import { Collectible } from '../entities/collectible';
+import { TronGrid } from '../TronGrid';
 
 export class MainScene extends Phaser.Scene {
   constructor() {
@@ -10,45 +8,51 @@ export class MainScene extends Phaser.Scene {
     // Game state
     this.score = 0;
     this.isGameOver = false;
-    this.gameSpeed = 300;
-    this.spawnTimer = 0;
-    this.dataSpawnTimer = 0;
     
     // Difficulty settings
     this.difficulties = {
       easy: { 
-        speed: 300, 
+        speed: 1.2, 
+        obstacleInterval: 2500, 
+        dataInterval: 1200 
+      },
+      normal: { 
+        speed: 1.5, 
         obstacleInterval: 2000, 
         dataInterval: 1000 
       },
-      normal: { 
-        speed: 350, 
+      hard: { 
+        speed: 2.0, 
         obstacleInterval: 1500, 
         dataInterval: 800 
-      },
-      hard: { 
-        speed: 400, 
-        obstacleInterval: 1200, 
-        dataInterval: 600 
       }
     };
     
     // Current difficulty
     this.difficulty = 'normal';
     
-    // Track loaded assets
-    this.assetsLoaded = {
-      player: false,
-      obstacle: false,
-      data: false,
-      background: false
-    };
+    // Game speed (controls how fast objects approach)
+    this.gameSpeed = 1.5;
+    
+    // Spawn timers
+    this.spawnTimer = 0;
+    this.dataSpawnTimer = 0;
+    
+    // Z-distance of objects (used for 3D perspective)
+    this.objectsPool = [];
+    
+    // Game lanes settings (normalized from 0 to 1 for perspective scaling)
+    this.lanes = [0.25, 0.5, 0.75]; // Left, Center, Right (as percentage of road width)
+    
+    // For road markers
+    this.markers = [];
   }
   
   init(data) {
     // Reset game state
     this.score = 0;
     this.isGameOver = false;
+    this.objectsPool = [];
     
     // Set difficulty if provided
     if (data && data.difficulty) {
@@ -59,12 +63,15 @@ export class MainScene extends Phaser.Scene {
     this.gameSpeed = this.difficulties[this.difficulty].speed;
     this.obstacleInterval = this.difficulties[this.difficulty].obstacleInterval;
     this.dataInterval = this.difficulties[this.difficulty].dataInterval;
+    
+    // Current lane (start in center)
+    this.currentLane = 1;
   }
   
   preload() {
     console.log('Preloading assets...');
     
-    // Create a loading bar for visual feedback
+    // Create a loading bar
     const progressBar = this.add.graphics();
     const progressBox = this.add.graphics();
     progressBox.fillStyle(0x222222, 0.8);
@@ -83,174 +90,89 @@ export class MainScene extends Phaser.Scene {
       progressBar.clear();
       progressBar.fillStyle(0xffffff, 1);
       progressBar.fillRect(250, 280, 300 * value, 30);
-      console.log(`Loading progress: ${Math.round(value * 100)}%`);
-    });
-    
-    this.load.on('fileprogress', (file) => {
-      console.log(`Loading file: ${file.key} (${Math.round(file.percentComplete * 100)}%)`);
-    });
-    
-    this.load.on('filecomplete', (key) => {
-      console.log(`File complete: ${key}`);
-      // Track successfully loaded assets
-      if (this.assetsLoaded.hasOwnProperty(key)) {
-        this.assetsLoaded[key] = true;
-      }
-    });
-    
-    this.load.on('loaderror', (file) => {
-      console.error(`Error loading file: ${file.key}`);
-      console.error(`URL attempted: ${file.url}`);
-      // Mark asset as failed
-      if (this.assetsLoaded.hasOwnProperty(file.key)) {
-        this.assetsLoaded[file.key] = false;
-      }
     });
     
     this.load.on('complete', () => {
-      console.log('All assets attempted to load');
-      console.log('Asset status:', this.assetsLoaded);
       progressBar.destroy();
       progressBox.destroy();
       loadingText.destroy();
     });
     
-    // Explicitly set the path for images - use public folder path
+    // Try to load images, but create fallbacks if needed
     this.load.setPath('/assets/images/');
-    this.load.image('player', 'player.png');
-    this.load.image('obstacle', 'obstacle.png');
-    this.load.image('data', 'data.png');
-    this.load.image('background', 'grid_bg.png');
     
-    // Set path for audio assets
+    try {
+      this.load.image('player', 'player.png');
+      this.load.image('obstacle', 'obstacle.png');
+      this.load.image('data', 'data.png');
+    } catch (e) {
+      console.error('Error loading game assets:', e);
+    }
+    
+    // Load audio assets
     this.load.setPath('/assets/audio/');
-    this.load.audio('jump', 'jump.mp3');
-    this.load.audio('collect', 'collect.mp3');
-    this.load.audio('hit', 'hit.mp3');
-    this.load.audio('gameover', 'gameover.mp3');
+    
+    try {
+      this.load.audio('jump', 'jump.mp3');
+      this.load.audio('collect', 'collect.mp3');
+      this.load.audio('hit', 'hit.mp3');
+      this.load.audio('gameover', 'gameover.mp3');
+    } catch (e) {
+      console.error('Error loading audio assets:', e);
+    }
   }
   
   create() {
     console.log('Creating game scene');
     
     // Get game dimensions
-    const gameWidth = this.cameras.main.width;  // Should be 800
-    const gameHeight = this.cameras.main.height; // Should be 400
-    console.log(`Game dimensions: ${gameWidth}x${gameHeight}`);
-    
-    // Debug to check asset loading
-    console.log('Texture status before fallbacks:');
-    console.log('- player:', this.textures.exists('player'));
-    console.log('- obstacle:', this.textures.exists('obstacle'));
-    console.log('- data:', this.textures.exists('data'));
-    console.log('- background:', this.textures.exists('background'));
+    this.gameWidth = this.cameras.main.width;
+    this.gameHeight = this.cameras.main.height;
     
     // Create fallback assets if needed
     this.createFallbackAssets();
     
-    console.log('Texture status after fallbacks:');
-    console.log('- player:', this.textures.exists('player'));
-    console.log('- obstacle:', this.textures.exists('obstacle'));
-    console.log('- data:', this.textures.exists('data'));
-    console.log('- background:', this.textures.exists('background'));
+    // Create the 3D perspective Tron grid
+    this.tronGrid = new TronGrid(this, {
+      horizonY: this.gameHeight * 0.35,       // Position horizon at 35% from top
+      gridWidth: this.gameWidth * 0.8,        // 80% of screen width at bottom
+      gridWidthAtHorizon: 60,                 // Narrow at horizon
+      color: 0x4f46e5,                        // Tron blue
+      lineAlpha: 0.8,                         // Semi-transparent
+      horizontalLines: 20,                    // More horizontal lines for smoother effect
+      verticalLines: 10,                      // Number of vertical lines
+      scrollSpeed: 2,                         // How fast grid moves toward viewer
+      lineWidth: 2                            // Line thickness
+    });
     
-    // Create background for 3D runner effect
-    try {
-      // Create tileSprite with grid
-      this.background = this.add.tileSprite(0, 0, gameWidth, gameHeight, 'background')
-        .setOrigin(0, 0)
-        .setScrollFactor(0, 0);
-      
-      // Check background texture dimensions
-      if (this.textures.exists('background')) {
-        const bgImage = this.textures.get('background').getSourceImage();
-        console.log(`Background texture dimensions: ${bgImage.width}x${bgImage.height}`);
-        
-        // Set tileScale to 1 since the texture is already correctly sized
-        this.background.tileScaleX = 1;
-        this.background.tileScaleY = 1;
-        
-        console.log('Background tileScale set to 1x1');
-      }
-      
-      console.log('Created background with texture');
-    } catch (e) {
-      console.error('Error creating background:', e);
-      // Fallback to simple rectangle
-      this.background = this.add.rectangle(0, 0, gameWidth, gameHeight, 0x0a0e17)
-        .setOrigin(0, 0);
-      console.log('Created fallback background rectangle');
-    }
+    // Set background color
+    this.cameras.main.setBackgroundColor(0x0a0e17); // Dark blue background
     
-    // Create center lane marker
-    const centerX = gameWidth / 2;
-    this.centerLine = this.add.line(0, 0, centerX, 0, centerX, gameHeight, 0x4f46e5, 0.3)
-      .setOrigin(0, 0);
-    
-    // Create ground - positioned at the bottom of the screen
-    this.groundY = gameHeight - 50;
-    this.ground = this.add.rectangle(0, this.groundY, gameWidth, 2, 0x4f46e5)
-      .setOrigin(0, 0);
-    this.physics.add.existing(this.ground, true);
-    
-    // Create player in center of screen
-    if (this.textures.exists('player')) {
-      try {
-        this.player = new Player(this, centerX, this.groundY - 50);
-        console.log('Player created successfully');
-      } catch (e) {
-        console.error('Error creating player:', e);
-        this.createSimplePlayer(centerX);
-      }
-    } else {
-      console.log('Player texture does not exist, creating simple player');
-      this.createSimplePlayer(centerX);
-    }
-    
-    // Create groups
-    this.obstacles = this.physics.add.group();
-    this.collectibles = this.physics.add.group();
-    
-    // Add colliders
-    this.physics.add.collider(this.player, this.ground);
-    this.physics.add.collider(this.obstacles, this.ground);
-    this.physics.add.collider(this.collectibles, this.ground);
-    
-    // Add overlap callbacks
-    this.physics.add.overlap(
-      this.player, 
-      this.obstacles, 
-      this.hitObstacle, 
-      null, 
-      this
-    );
-    
-    this.physics.add.overlap(
-      this.player, 
-      this.collectibles, 
-      this.collectData, 
-      null, 
-      this
-    );
+    // Create player character
+    this.createPlayer();
     
     // Add score text
     this.scoreText = this.add.text(20, 20, 'SCORE: 0', {
       fontSize: '24px',
-      fontFamily: 'Orbitron',
-      color: '#e0e7ff'
-    }).setScrollFactor(0);
+      fontFamily: 'Orbitron, sans-serif',
+      color: '#e0e7ff',
+      stroke: '#000000',
+      strokeThickness: 3
+    }).setScrollFactor(0).setDepth(100);
     
     // Add difficulty text
     this.difficultyText = this.add.text(
-      gameWidth - 20, 
+      this.gameWidth - 20, 
       20, 
       `LEVEL: ${this.difficulty.toUpperCase()}`, 
       {
         fontSize: '18px',
-        fontFamily: 'Orbitron',
-        color: '#a9b4d1'
+        fontFamily: 'Orbitron, sans-serif',
+        color: '#a9b4d1',
+        stroke: '#000000',
+        strokeThickness: 3
       }
-    ).setScrollFactor(0).setOrigin(1, 0);
+    ).setScrollFactor(0).setOrigin(1, 0).setDepth(100);
     
     // Setup input for jumping
     this.input.on('pointerdown', this.jump, this);
@@ -259,25 +181,20 @@ export class MainScene extends Phaser.Scene {
     // Add keyboard controls for left/right movement
     this.cursors = this.input.keyboard.createCursorKeys();
     
-    // Add swipe controls for mobile
-    this.input.on('pointermove', this.handleSwipe, this);
-    this.input.on('pointerup', this.endSwipe, this);
-    this.swipeStart = null;
-    
-    // Game lanes settings
-    this.lanes = [
-      gameWidth / 4,           // Left lane
-      gameWidth / 2,           // Center lane
-      (gameWidth / 4) * 3      // Right lane
-    ];
-    
-    // Current lane (start in center)
-    this.currentLane = 1;
-    
     // Start game
     this.isGameOver = false;
     this.spawnTimer = this.obstacleInterval;
     this.dataSpawnTimer = this.dataInterval;
+    
+    // Add some initial objects
+    for (let i = 0; i < 10; i++) {
+      const z = 200 + (i * 100);
+      if (i % 3 === 0) {
+        this.spawnObstacleAtDistance(z);
+      } else {
+        this.spawnCollectibleAtDistance(z);
+      }
+    }
     
     // Speed increase over time
     this.time.addEvent({
@@ -290,147 +207,22 @@ export class MainScene extends Phaser.Scene {
     console.log('Game scene created successfully');
   }
   
-  // Create a simple player rectangle
-  createSimplePlayer(centerX) {
-    console.log('Creating simple player rectangle');
-    this.player = this.physics.add.rectangle(centerX, this.groundY - 50, 30, 30, 0x4f46e5);
-    this.player.setCollideWorldBounds(true);
-    this.player.setBounce(0.1);
-    this.player.setGravityY(1000);
-    
-    // Add custom jump method
-    this.player.jump = function() {
-      if (this.body.touching.down) {
-        this.setVelocityY(-500);
-      }
-    };
-    
-    // Add lane movement method
-    this.player.moveTo = function(x, duration = 200) {
-      this.scene.tweens.add({
-        targets: this,
-        x: x,
-        duration: duration,
-        ease: 'Power2'
-      });
-    };
-  }
-  
-  // Handle swiping on mobile
-  handleSwipe(pointer) {
-    if (!this.swipeStart) {
-      this.swipeStart = { x: pointer.x, y: pointer.y, time: pointer.time };
-    }
-  }
-  
-  endSwipe(pointer) {
-    if (this.swipeStart && !this.isGameOver) {
-      const swipeTime = pointer.time - this.swipeStart.time;
-      const swipeDistance = Phaser.Math.Distance.Between(
-        this.swipeStart.x, this.swipeStart.y, 
-        pointer.x, pointer.y
-      );
-      
-      // Check if this is a valid swipe
-      if (swipeTime < 1000 && swipeDistance > 50) {
-        // Check swipe direction
-        const swipeX = pointer.x - this.swipeStart.x;
-        const swipeY = pointer.y - this.swipeStart.y;
-        
-        // Horizontal swipe detection (with greater tolerance for diagonal swipes)
-        if (Math.abs(swipeX) > Math.abs(swipeY) * 0.5) {
-          if (swipeX > 0) {
-            this.moveRight();
-          } else {
-            this.moveLeft();
-          }
-        }
-        
-        // Vertical swipe detection - only for upward swipes (jump)
-        if (swipeY < -50 && Math.abs(swipeY) > Math.abs(swipeX)) {
-          this.jump();
-        }
-      }
-    }
-    
-    // Reset swipe start
-    this.swipeStart = null;
-  }
-  
-  createFallbackAssets() {
-    // Create fallback textures one by one with specific error handling
-    try {
-      if (!this.textures.exists('player')) {
-        console.log('Creating fallback player texture');
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        graphics.fillStyle(0x4f46e5, 1);
-        graphics.fillRect(0, 0, 30, 30); // Use rectangle instead of circle for simplicity
-        graphics.generateTexture('player', 30, 30);
-        console.log('Player texture created:', this.textures.exists('player'));
-        graphics.destroy();
-      }
-    } catch (e) {
-      console.error('Failed to create player texture:', e);
-    }
-    
-    // Separate try/catch for each texture
-    try {
-      if (!this.textures.exists('obstacle')) {
-        console.log('Creating fallback obstacle texture');
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        graphics.fillStyle(0xef4444, 1);
-        graphics.fillRect(0, 0, 40, 20);
-        graphics.generateTexture('obstacle', 40, 20);
-        console.log('Obstacle texture created:', this.textures.exists('obstacle'));
-        graphics.destroy();
-      }
-    } catch (e) {
-      console.error('Failed to create obstacle texture:', e);
-    }
-    
-    try {
-      if (!this.textures.exists('data')) {
-        console.log('Creating fallback data texture');
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        graphics.fillStyle(0x38bdf8, 1);
-        graphics.fillRect(0, 0, 24, 24);
-        graphics.generateTexture('data', 24, 24);
-        console.log('Data texture created:', this.textures.exists('data'));
-        graphics.destroy();
-      }
-    } catch (e) {
-      console.error('Failed to create data texture:', e);
-    }
-    
-    try {
-      if (!this.textures.exists('background')) {
-        console.log('Creating fallback background texture');
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        graphics.fillStyle(0x0a0e17, 1);
-        graphics.fillRect(0, 0, 64, 64);
-        graphics.lineStyle(1, 0x1d2837, 0.3);
-        graphics.strokeRect(0, 0, 32, 32);
-        graphics.generateTexture('background', 64, 64);
-        console.log('Background texture created:', this.textures.exists('background'));
-        graphics.destroy();
-      }
-    } catch (e) {
-      console.error('Failed to create background texture:', e);
-    }
-  }
-  
   update(time, delta) {
     if (this.isGameOver) return;
     
-    // Move background (scrolling down effect for 3D feel)
-    if (this.background && this.background.tilePositionY !== undefined) {
-      this.background.tilePositionY += (this.gameSpeed / 120) * (delta / 16.666);
+    // Update the Tron grid
+    this.tronGrid.update(delta);
+    
+    // Update player glow position
+    if (this.playerGlow && this.player) {
+      this.playerGlow.x = this.player.x;
+      this.playerGlow.y = this.player.y + 20;
     }
     
-    // Handle keyboard controls
-    if (this.cursors.left.isDown) {
+    // Handle keyboard input
+    if (Phaser.Input.Keyboard.JustDown(this.cursors.left)) {
       this.moveLeft();
-    } else if (this.cursors.right.isDown) {
+    } else if (Phaser.Input.Keyboard.JustDown(this.cursors.right)) {
       this.moveRight();
     }
     
@@ -447,376 +239,653 @@ export class MainScene extends Phaser.Scene {
       this.dataSpawnTimer = this.dataInterval;
     }
     
-    // Update player
-    if (this.player && typeof this.player.update === 'function') {
-      this.player.update();
-    }
-    
-    // Update obstacles and collectibles
-    this.obstacles.getChildren().forEach(obstacle => {
-      // Update custom obstacle animations
-      if (typeof obstacle.update === 'function') {
-        obstacle.update();
+    // Filter out collected objects from our processing arrays
+    this.objectsPool = this.objectsPool.filter(obj => {
+      // If this is a collected object, destroy its sprite and remove from pool
+      if (obj.type === 'collectible' && obj.collected) {
+        return false; // remove from pool
       }
       
-      // Move obstacles forward (down)
-      obstacle.y += (this.gameSpeed / 60) * (delta / 16.666);
+      // Update z position (moving closer to the camera)
+      obj.z -= this.gameSpeed * (delta / 16.667);
       
-      // Remove if off screen
-      if (obstacle.y > this.cameras.main.height + 50) {
-        obstacle.destroy();
+      // If object has passed the camera, destroy and remove
+      if (obj.z <= 0) {
+        if (obj.sprite) {
+          obj.sprite.destroy();
+        }
+        return false; // remove from pool
+      }
+      
+      // Update visual properties based on z-distance
+      this.updateObjectVisuals(obj);
+      
+      // Check for collisions with player
+      if (obj.z < 50 && obj.z > 30) {
+        // Calculate lane of object
+        const objLaneIndex = Math.round(obj.lane * (this.lanes.length - 1));
+        
+        if (objLaneIndex === this.currentLane) {
+          if (obj.type === 'collectible' && !obj.collected) {
+            // Collect data
+            this.collectData(obj);
+            // Don't remove from array yet, just mark as collected
+          } else if (obj.type === 'obstacle' && !this.player.isJumping && !obj.hit) {
+            // Hit obstacle - only if not already hit
+            this.hitObstacle(obj);
+          }
+        }
+      }
+      
+      return true; // keep in pool
+    });
+  }
+  
+  createFallbackAssets() {
+    // Create fallback textures if needed
+    try {
+      if (!this.textures.exists('player')) {
+        console.log('Creating fallback player texture');
+        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
+        graphics.fillStyle(0x4f46e5, 1);
+        graphics.fillRect(0, 0, 30, 30);
+        graphics.generateTexture('player', 30, 30);
+        graphics.destroy();
+      }
+    } catch (e) {
+      console.error('Failed to create player texture:', e);
+    }
+    
+    try {
+      if (!this.textures.exists('obstacle')) {
+        console.log('Creating fallback obstacle texture');
+        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
+        graphics.fillStyle(0xef4444, 1);
+        graphics.fillRect(0, 0, 60, 40);
+        graphics.generateTexture('obstacle', 60, 40);
+        graphics.destroy();
+      }
+    } catch (e) {
+      console.error('Failed to create obstacle texture:', e);
+    }
+    
+    try {
+      if (!this.textures.exists('data')) {
+        console.log('Creating fallback data texture');
+        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
+        graphics.fillStyle(0x38bdf8, 1);
+        graphics.fillRect(0, 0, 20, 20);
+        graphics.generateTexture('data', 20, 20);
+        graphics.destroy();
+      }
+    } catch (e) {
+      console.error('Failed to create data texture:', e);
+    }
+  }
+  
+  createPlayer() {
+    // Player is positioned at the bottom center of the screen
+    const playerX = this.gameWidth / 2;
+    const playerY = this.gameHeight - 80; // A bit up from the bottom
+    
+    // If player texture exists, use it; otherwise create a simple sprite
+    if (this.textures.exists('player')) {
+      this.player = this.add.sprite(playerX, playerY, 'player');
+      this.player.setDisplaySize(70, 70);
+    } else {
+      this.player = this.add.rectangle(playerX, playerY, 70, 70, 0x4f46e5);
+    }
+    
+    // Set player properties
+    this.player.setDepth(50);
+    this.player.isJumping = false;
+    this.player.jumpHeight = 100;
+    this.player.jumpDuration = 500;
+    
+    // Add glow effect to make player more visible
+    this.playerGlow = this.add.ellipse(
+      playerX,
+      playerY + 20,
+      90,
+      30,
+      0x4f46e5,
+      0.4
+    );
+    this.playerGlow.setDepth(45);
+    
+    // Create pulsing effect for the glow
+    this.tweens.add({
+      targets: this.playerGlow,
+      alpha: { from: 0.4, to: 0.6 },
+      scale: { from: 1, to: 1.1 },
+      duration: 1000,
+      yoyo: true,
+      repeat: -1
+    });
+    
+    // Set current lane (center by default)
+    this.currentLane = 1;
+    this.movePlayerToLane(1); // Ensure player is centered
+  }
+  
+  jump() {
+    if (this.isGameOver || !this.player || this.player.isJumping) return;
+    
+    // Set jumping flag
+    this.player.isJumping = true;
+    
+    // Play jump sound
+    if (this.sound && this.sound.get('jump')) {
+      this.sound.play('jump', { volume: 0.5 });
+    }
+    
+    // Create jump tween
+    this.tweens.add({
+      targets: this.player,
+      y: this.player.y - this.player.jumpHeight,
+      duration: this.player.jumpDuration / 2,
+      ease: 'Sine.easeOut',
+      yoyo: true,
+      onComplete: () => {
+        this.player.isJumping = false;
       }
     });
     
-    this.collectibles.getChildren().forEach(collectible => {
-      // Update custom collectible animations
-      if (typeof collectible.update === 'function') {
-        collectible.update();
-      }
-      
-      // Move collectibles forward (down)
-      collectible.y += (this.gameSpeed / 60) * (delta / 16.666);
-      
-      // Remove if off screen
-      if (collectible.y > this.cameras.main.height + 50) {
-        collectible.destroy();
+    // Move glow with player
+    if (this.playerGlow) {
+      this.tweens.add({
+        targets: this.playerGlow,
+        y: this.playerGlow.y - this.player.jumpHeight,
+        duration: this.player.jumpDuration / 2,
+        ease: 'Sine.easeOut',
+        yoyo: true
+      });
+    }
+    
+    // Create jump effect
+    this.createJumpEffect();
+  }
+  
+  createJumpEffect() {
+    // Create a visual jump effect
+    const jumpEffect = this.add.ellipse(
+      this.player.x,
+      this.player.y + 35,
+      80,
+      20,
+      0x4f46e5,
+      0.6
+    );
+    jumpEffect.setDepth(40);
+    
+    // Animate the jump effect
+    this.tweens.add({
+      targets: jumpEffect,
+      scaleX: 1.5,
+      scaleY: 0.5,
+      alpha: 0,
+      duration: 300,
+      onComplete: () => {
+        jumpEffect.destroy();
       }
     });
   }
   
-  // Player left lane movement
   moveLeft() {
-    if (this.isGameOver) return;
+    if (this.isGameOver || !this.player) return;
     
     // Check if we can move left
     if (this.currentLane > 0) {
       this.currentLane--;
-      const targetX = this.lanes[this.currentLane];
-      
-      // Move player to the target lane
-      if (this.player.moveTo) {
-        this.player.moveTo(targetX);
-      } else {
-        // For standard sprites without a custom moveTo method
-        this.tweens.add({
-          targets: this.player,
-          x: targetX,
-          duration: 200,
-          ease: 'Power2'
-        });
-      }
-      
-      // Play a sound effect if available
-      try {
-        if (this.sound && this.sound.get('move')) {
-          this.sound.play('move', { volume: 0.3 });
-        }
-      } catch (e) {
-        console.error('Error playing move sound:', e);
-      }
+      this.movePlayerToLane(this.currentLane);
     }
   }
   
-  // Player right lane movement
   moveRight() {
-    if (this.isGameOver) return;
+    if (this.isGameOver || !this.player) return;
     
     // Check if we can move right
     if (this.currentLane < this.lanes.length - 1) {
       this.currentLane++;
-      const targetX = this.lanes[this.currentLane];
-      
-      // Move player to the target lane
-      if (this.player.moveTo) {
-        this.player.moveTo(targetX);
-      } else {
-        // For standard sprites without a custom moveTo method
-        this.tweens.add({
-          targets: this.player,
-          x: targetX,
-          duration: 200,
-          ease: 'Power2'
-        });
-      }
-      
-      // Play a sound effect if available
-      try {
-        if (this.sound && this.sound.get('move')) {
-          this.sound.play('move', { volume: 0.3 });
-        }
-      } catch (e) {
-        console.error('Error playing move sound:', e);
-      }
+      this.movePlayerToLane(this.currentLane);
     }
   }
   
-  jump() {
-    try {
-      if (!this.isGameOver && this.player) {
-        // Check if player is on ground
-        const isOnGround = this.player.body && this.player.body.touching && this.player.body.touching.down;
-        
-        if (isOnGround) {
-          // Use player's jump method if available
-          if (typeof this.player.jump === 'function') {
-            this.player.jump();
-          } else {
-            // Otherwise apply velocity directly
-            this.player.body.setVelocityY(-500);
-          }
-          
-          // Play sound with safety check
-          if (this.sound && this.sound.get && this.sound.get('jump')) {
-            this.sound.play('jump', { volume: 0.5 });
-          }
-        }
-      }
-    } catch (e) {
-      console.error('Error in jump method:', e);
+  movePlayerToLane(laneIndex) {
+    if (!this.player) return;
+    
+    // Safety check for laneIndex
+    if (laneIndex < 0 || laneIndex >= this.lanes.length) {
+      console.error("Invalid lane index:", laneIndex);
+      return;
+    }
+    
+    // Store the current position before updating
+    const currentPlayerX = this.player.x;
+    
+    // Calculate the X position based on lane
+    const playerY = this.player.y;
+    const perspectiveRatio = (playerY - this.tronGrid.config.horizonY) / 
+                            (this.gameHeight - this.tronGrid.config.horizonY);
+    const roadWidth = this.tronGrid.config.gridWidthAtHorizon + 
+                     (this.tronGrid.config.gridWidth - this.tronGrid.config.gridWidthAtHorizon) * 
+                     perspectiveRatio;
+    const roadLeft = (this.gameWidth - roadWidth) / 2;
+    const lanePosition = this.lanes[laneIndex];
+    const targetX = roadLeft + roadWidth * lanePosition;
+    
+    // Don't move if we're already very close to the target position
+    if (Math.abs(targetX - currentPlayerX) < 5) {
+      return;
+    }
+    
+    // Clear any existing movement tweens
+    this.tweens.killTweensOf(this.player);
+    if (this.playerGlow) {
+      this.tweens.killTweensOf(this.playerGlow);
+    }
+    
+    // Create tween to move player
+    this.tweens.add({
+      targets: this.player,
+      x: targetX,
+      duration: 200,
+      ease: 'Sine.easeInOut'
+    });
+    
+    // Move glow with player
+    if (this.playerGlow) {
+      this.tweens.add({
+        targets: this.playerGlow,
+        x: targetX,
+        duration: 200,
+        ease: 'Sine.easeInOut'
+      });
     }
   }
   
   spawnObstacle() {
-    try {
-      // Random lane
-      const lane = Phaser.Math.Between(0, this.lanes.length - 1);
-      const laneX = this.lanes[lane];
-      
-      // Random obstacle size
-      const height = Phaser.Math.Between(20, 40);
-      const width = Phaser.Math.Between(30, 80);
-      
-      // Position at top of screen but in the right lane
-      const obstacleY = -50; // Just above the screen
-      
-      // Check if we have the obstacle texture
-      if (this.textures.exists('obstacle')) {
-        // Create obstacle sprite directly (without using the class)
-        const obstacle = this.physics.add.sprite(laneX, obstacleY, 'obstacle');
-        obstacle.setDisplaySize(width, height);
-        obstacle.setTint(0xef4444);
-        
-        // Set the physics properties
-        obstacle.body.allowGravity = false;
-        obstacle.body.immovable = true;
-        
-        this.obstacles.add(obstacle);
-        console.log('Obstacle spawned in lane', lane);
-      } else {
-        // Use rectangle as fallback
-        const rectObstacle = this.physics.add.rectangle(
-          laneX,
-          obstacleY,
-          width,
-          height,
-          0xef4444
-        );
-        
-        rectObstacle.body.allowGravity = false;
-        rectObstacle.body.immovable = true;
-        
-        this.obstacles.add(rectObstacle);
-      }
-    } catch (e) {
-      console.error('Error spawning obstacle:', e);
+    // Pick a random lane index
+    const laneIndex = Math.floor(Math.random() * this.lanes.length);
+    
+    // Spawn it far into the distance
+    this.spawnObstacleAtDistance(1000);
+  }
+  
+  spawnObstacleAtDistance(z) {
+    // Pick a random lane index
+    const laneIndex = Math.floor(Math.random() * this.lanes.length);
+    
+    // Calculate initial visual position based on z distance
+    const ratio = 40 / z;
+    const y = this.tronGrid.config.horizonY + 
+             (this.gameHeight - this.tronGrid.config.horizonY) * ratio;
+    
+    // Calculate lane position
+    const lane = this.lanes[laneIndex];
+    
+    // Calculate x position based on perspective
+    const perspectiveRatio = (y - this.tronGrid.config.horizonY) / 
+                            (this.gameHeight - this.tronGrid.config.horizonY);
+    const roadWidth = this.tronGrid.config.gridWidthAtHorizon + 
+                     (this.tronGrid.config.gridWidth - this.tronGrid.config.gridWidthAtHorizon) * 
+                     perspectiveRatio;
+    const roadLeft = (this.gameWidth - roadWidth) / 2;
+    const x = roadLeft + roadWidth * lane;
+    
+    // Create sprite
+    let sprite;
+    if (this.textures.exists('obstacle')) {
+      sprite = this.add.sprite(x, y, 'obstacle');
+      sprite.setTint(0xef4444);
+    } else {
+      sprite = this.add.rectangle(x, y, 10, 5, 0xef4444);
     }
+    
+    // Set rendering depth
+    sprite.setDepth(30);
+    
+    // Create obstacle object and add to pool
+    const obstacle = {
+      type: 'obstacle',
+      sprite: sprite,
+      lane: laneIndex / (this.lanes.length - 1), // Normalize to 0-1
+      z: z,
+      baseWidth: 80,
+      baseHeight: 60,
+      hit: false
+    };
+    
+    this.objectsPool.push(obstacle);
+    
+    // Initial size update
+    this.updateObjectVisuals(obstacle);
   }
   
   spawnCollectible() {
-    try {
-      // Random lane
-      const lane = Phaser.Math.Between(0, this.lanes.length - 1);
-      const laneX = this.lanes[lane];
-      
-      // Position above the screen
-      const collectibleY = -50;
-      
-      // Check if we have the data texture
-      if (this.textures.exists('data')) {
-        // Create collectible sprite directly
-        const collectible = this.physics.add.sprite(laneX, collectibleY, 'data');
-        collectible.setDisplaySize(24, 24);
-        collectible.setTint(0x38bdf8);
-        
-        // Set physics properties
-        collectible.body.allowGravity = false;
-        
-        // Add pulsing effect
-        this.tweens.add({
-          targets: collectible,
-          scale: { from: 1, to: 1.2 },
-          duration: 500,
-          yoyo: true,
-          repeat: -1,
-          ease: 'Sine.easeInOut'
-        });
-        
-        this.collectibles.add(collectible);
-        console.log('Collectible spawned in lane', lane);
-      } else {
-        // Use rectangle as fallback
-        const rectCollectible = this.physics.add.rectangle(
-          laneX,
-          collectibleY,
-          24,
-          24,
-          0x38bdf8
-        );
-        
-        rectCollectible.body.allowGravity = false;
-        
-        this.collectibles.add(rectCollectible);
-      }
-    } catch (e) {
-      console.error('Error spawning collectible:', e);
-    }
+    // Spawn data collectible far into the distance
+    this.spawnCollectibleAtDistance(1000);
   }
   
-  collectData(player, collectible) {
-    console.log('Data collected');
+  spawnCollectibleAtDistance(z) {
+    // Pick a random lane index
+    const laneIndex = Math.floor(Math.random() * this.lanes.length);
     
-    try {
-      // Play sound with safety check
-      if (this.sound && this.sound.get && this.sound.get('collect')) {
-        this.sound.play('collect', { volume: 0.5 });
-      }
-      
-      // Update score
-      this.score += 10;
-      this.scoreText.setText(`SCORE: ${this.score}`);
-      
-      // Send score update to game engine
-      this.game.events.emit('updateScore', 10);
-      
-      // Visual feedback
-      this.tweens.add({
-        targets: this.scoreText,
-        scale: { from: 1.2, to: 1 },
-        duration: 200,
-        ease: 'Sine.easeOut'
-      });
-      
-      // Destroy collectible
-      collectible.destroy();
-      
-      // Create simple particle effect
-      try {
-        const particles = this.add.particles(collectible.x, collectible.y, 'data', {
-          scale: { start: 0.5, end: 0 },
-          speed: { min: 50, max: 100 },
-          lifespan: 500,
-          blendMode: 'ADD',
-          quantity: 10
-        });
-        
-        // Auto-destroy particles
-        this.time.delayedCall(500, () => {
-          particles.destroy();
-        });
-      } catch (e) {
-        console.error('Error creating particles:', e);
-      }
-    } catch (e) {
-      console.error('Error in collectData method:', e);
+    // Calculate initial visual position based on z distance
+    const ratio = 40 / z;
+    const y = this.tronGrid.config.horizonY + 
+             (this.gameHeight - this.tronGrid.config.horizonY) * ratio;
+    
+    // Calculate lane position
+    const lane = this.lanes[laneIndex];
+    
+    // Calculate x position based on perspective
+    const perspectiveRatio = (y - this.tronGrid.config.horizonY) / 
+                            (this.gameHeight - this.tronGrid.config.horizonY);
+    const roadWidth = this.tronGrid.config.gridWidthAtHorizon + 
+                     (this.tronGrid.config.gridWidth - this.tronGrid.config.gridWidthAtHorizon) * 
+                     perspectiveRatio;
+    const roadLeft = (this.gameWidth - roadWidth) / 2;
+    const x = roadLeft + roadWidth * lane;
+    
+    // Create sprite
+    let sprite;
+    if (this.textures.exists('data')) {
+      sprite = this.add.sprite(x, y, 'data');
+      sprite.setTint(0x38bdf8);
+    } else {
+      sprite = this.add.rectangle(x, y, 8, 8, 0x38bdf8);
     }
+    
+    // Set rendering depth
+    sprite.setDepth(30);
+    
+    // Add pulsing animation
+    this.tweens.add({
+      targets: sprite,
+      scaleX: 1.2,
+      scaleY: 1.2,
+      duration: 500,
+      yoyo: true,
+      repeat: -1
+    });
+    
+    // Create collectible object and add to pool
+    const collectible = {
+      type: 'collectible',
+      sprite: sprite,
+      lane: laneIndex / (this.lanes.length - 1), // Normalize to 0-1
+      z: z,
+      baseWidth: 30,
+      baseHeight: 30,
+      collected: false
+    };
+    
+    this.objectsPool.push(collectible);
+    
+    // Initial size update
+    this.updateObjectVisuals(collectible);
   }
   
-  hitObstacle(player, obstacle) {
+  updateObjectVisuals(obj) {
+    // Skip if this object has been collected
+    if ((obj.type === 'collectible' && obj.collected) || 
+        (obj.sprite && !obj.sprite.visible)) {
+      return;
+    }
+    
+    // Calculate perspective ratio based on z distance
+    const ratio = 40 / obj.z;
+    
+    // Calculate perspective coordinates
+    const y = this.tronGrid.config.horizonY + 
+             (this.gameHeight - this.tronGrid.config.horizonY) * ratio;
+    
+    // Calculate road width at this y position
+    const perspectiveRatio = (y - this.tronGrid.config.horizonY) / 
+                            (this.gameHeight - this.tronGrid.config.horizonY);
+    const roadWidth = this.tronGrid.config.gridWidthAtHorizon + 
+                     (this.tronGrid.config.gridWidth - this.tronGrid.config.gridWidthAtHorizon) * 
+                     perspectiveRatio;
+    const roadLeft = (this.gameWidth - roadWidth) / 2;
+    
+    // Calculate x position based on lane
+    const laneIndex = Math.round(obj.lane * (this.lanes.length - 1));
+    const lanePosition = this.lanes[laneIndex];
+    const x = roadLeft + roadWidth * lanePosition;
+    
+    // Update sprite position
+    obj.sprite.x = x;
+    obj.sprite.y = y;
+    
+    // Update sprite size based on distance
+    const scale = ratio * 2.0; // Boosted scaling factor for better visibility
+    obj.sprite.displayWidth = obj.baseWidth * scale;
+    obj.sprite.displayHeight = obj.baseHeight * scale;
+    
+    // Adjust visibility (fade out at the horizon)
+    obj.sprite.alpha = Math.min(1, ratio * 2);
+  }
+  
+  collectData(obj) {
+    // Immediately prevent any duplicate collection
+    if (obj.collected) return;
+    
+    // Mark as collected
+    obj.collected = true;
+    
+    // Play sound
+    if (this.sound && this.sound.get('collect')) {
+      this.sound.play('collect', { volume: 0.5 });
+    }
+    
+    // Update score
+    this.score += 10;
+    this.scoreText.setText(`SCORE: ${this.score}`);
+    
+    // Hide the sprite immediately to prevent visual glitches
+    obj.sprite.visible = false;
+    
+    // Create particle effect directly
+    this.createCollectParticles(obj.sprite.x, obj.sprite.y);
+    
+    // Visual feedback on score
+    this.tweens.add({
+      targets: this.scoreText,
+      scale: { from: 1.2, to: 1 },
+      duration: 200,
+      ease: 'Sine.easeOut'
+    });
+  }
+  
+  createCollectParticles(x, y) {
+    // Create simple particle effect for data collection
+    for (let i = 0; i < 15; i++) {
+      const particle = this.add.circle(x, y, 5, 0x38bdf8);
+      particle.setAlpha(0.7);
+      particle.setDepth(40);
+      
+      this.tweens.add({
+        targets: particle,
+        x: x + Math.floor(Math.random() * 100) - 50,
+        y: y + Math.floor(Math.random() * 100) - 50,
+        alpha: 0,
+        scale: 0,
+        duration: 500,
+        onComplete: () => {
+          particle.destroy();
+        }
+      });
+    }
+    
+    // Add floating score text
+    const scorePopup = this.add.text(x, y - 20, '+10', {
+      fontFamily: 'Orbitron, sans-serif',
+      fontSize: '20px',
+      color: '#38bdf8'
+    }).setOrigin(0.5);
+    scorePopup.setDepth(45);
+    
+    // Animate score popup
+    this.tweens.add({
+      targets: scorePopup,
+      y: y - 50,
+      alpha: 0,
+      duration: 800,
+      onComplete: () => {
+        scorePopup.destroy();
+      }
+    });
+  }
+  
+  hitObstacle(obj) {
     if (this.isGameOver) return;
     
-    console.log('Hit obstacle, game over');
+    console.log("Hit obstacle");
     
-    try {
-      // Set game over state
-      this.isGameOver = true;
-      
-      // Play sound with safety check
-      if (this.sound && this.sound.get) {
-        if (this.sound.get('hit')) {
-          this.sound.play('hit', { volume: 0.7 });
-        }
-        
-        if (this.sound.get('gameover')) {
-          this.sound.play('gameover', { volume: 0.5, delay: 0.5 });
-        }
-      }
-      
-      // Flash player
-      this.tweens.add({
-        targets: this.player,
-        alpha: { from: 0, to: 1 },
-        duration: 100,
-        repeat: 5
-      });
-      
-      // Show game over text
-      const gameOverText = this.add.text(
-        this.cameras.main.width / 2, 
-        this.cameras.main.height / 2 - 50, 
-        'GAME OVER', 
-        {
-          fontSize: '48px',
-          fontFamily: 'Orbitron',
-          color: '#ef4444',
-          stroke: '#000000',
-          strokeThickness: 6
-        }
-      ).setScrollFactor(0).setOrigin(0.5);
-      
-      const scoreText = this.add.text(
-        this.cameras.main.width / 2, 
-        this.cameras.main.height / 2 + 20, 
-        `SCORE: ${this.score}`, 
-        {
-          fontSize: '32px',
-          fontFamily: 'Orbitron',
-          color: '#e0e7ff'
-        }
-      ).setScrollFactor(0).setOrigin(0.5);
-      
-      // Add glitch effect to game over text
-      this.tweens.add({
-        targets: gameOverText,
-        x: { from: gameOverText.x - 4, to: gameOverText.x + 4 },
-        duration: 50,
-        yoyo: true,
-        repeat: -1
-      });
-      
-      // Trigger game over callback after delay
-      this.time.delayedCall(2000, () => {
-        console.log('Game over, sending final score:', this.score);
-        
-        // Send score back to game component
-        if (this.game && this.game.events) {
-          this.game.events.emit('gameOver', this.score);
-        }
-        
-        // Check if GameOverScene exists before starting it
-        if (this.scene.get('GameOverScene')) {
-          this.scene.start('GameOverScene', { score: this.score });
-        } else {
-          console.warn('GameOverScene not found, restarting MainScene');
-          this.scene.restart();
-        }
-      });
-    } catch (e) {
-      console.error('Error in hitObstacle method:', e);
+    // Mark as hit to prevent multiple hits
+    obj.hit = true;
+    this.isGameOver = true;
+    
+    // Play sound
+    if (this.sound && this.sound.get('hit')) {
+      this.sound.play('hit', { volume: 0.7 });
     }
+    
+    // Delayed game over sound
+    if (this.sound && this.sound.get('gameover')) {
+      this.sound.play('gameover', { volume: 0.5, delay: 0.5 });
+    }
+    
+    // Flash player
+    this.tweens.add({
+      targets: this.player,
+      alpha: 0,
+      duration: 100,
+      yoyo: true,
+      repeat: 5
+    });
+    
+    // Create crash effect
+    this.createCrashEffect(obj.sprite.x, obj.sprite.y);
+    
+    // Show game over text
+    const gameOverText = this.add.text(
+      this.gameWidth / 2, 
+      this.gameHeight / 2 - 50, 
+      'GAME OVER', 
+      {
+        fontSize: '48px',
+        fontFamily: 'Orbitron, sans-serif',
+        color: '#ef4444',
+        stroke: '#000000',
+        strokeThickness: 6
+      }
+    ).setScrollFactor(0).setOrigin(0.5).setDepth(100);
+    
+    const finalScoreText = this.add.text(
+      this.gameWidth / 2, 
+      this.gameHeight / 2 + 20, 
+      `SCORE: ${this.score}`, 
+      {
+        fontSize: '32px',
+        fontFamily: 'Orbitron, sans-serif',
+        color: '#e0e7ff'
+      }
+    ).setScrollFactor(0).setOrigin(0.5).setDepth(100);
+    
+    // Add glitch effect to game over text
+    this.tweens.add({
+      targets: gameOverText,
+      x: { from: gameOverText.x - 4, to: gameOverText.x + 4 },
+      duration: 50,
+      yoyo: true,
+      repeat: -1
+    });
+    
+    // Create "Play Again" button
+    const playAgainButton = this.add.rectangle(
+      this.gameWidth / 2,
+      this.gameHeight / 2 + 80,
+      200,
+      50,
+      0x4f46e5
+    ).setInteractive();
+    
+    const playAgainText = this.add.text(
+      this.gameWidth / 2,
+      this.gameHeight / 2 + 80,
+      'PLAY AGAIN',
+      {
+        fontSize: '24px',
+        fontFamily: 'Orbitron, sans-serif',
+        color: '#FFFFFF'
+      }
+    ).setScrollFactor(0).setOrigin(0.5).setDepth(100);
+    
+    // Add button interaction
+    playAgainButton.on('pointerdown', () => {
+      this.scene.restart();
+    });
+    
+    // Add button hover effects
+    playAgainButton.on('pointerover', () => {
+      playAgainButton.setScale(1.05);
+      playAgainText.setScale(1.05);
+    });
+    
+    playAgainButton.on('pointerout', () => {
+      playAgainButton.setScale(1);
+      playAgainText.setScale(1);
+    });
+  }
+  
+  createCrashEffect(x, y) {
+    // Create explosion particles
+    for (let i = 0; i < 30; i++) {
+      const particle = this.add.circle(x, y, Math.floor(Math.random() * 5) + 3, 0xef4444);
+      particle.setDepth(60);
+      
+      this.tweens.add({
+        targets: particle,
+        x: x + Math.floor(Math.random() * 200) - 100,
+        y: y + Math.floor(Math.random() * 200) - 100,
+        alpha: 0,
+        scale: { from: 1, to: 0 },
+        duration: Math.floor(Math.random() * 500) + 500,
+        onComplete: () => {
+          particle.destroy();
+        }
+      });
+    }
+    
+    // Add explosion effect
+    const explosion = this.add.circle(x, y, 40, 0xef4444, 0.7);
+    explosion.setDepth(55);
+    
+    this.tweens.add({
+      targets: explosion,
+      scale: 3,
+      alpha: 0,
+      duration: 500,
+      onComplete: () => {
+        explosion.destroy();
+      }
+    });
   }
   
   increaseSpeed() {
-    try {
-      // Gradually increase game speed
-      this.gameSpeed += 10;
+    // Only increase speed if not at maximum
+    if (this.gameSpeed < 5) {
+      this.gameSpeed += 0.2;
       console.log('Game speed increased to:', this.gameSpeed);
       
-      // Update difficulty text if needed
-      if (this.difficultyText && this.gameSpeed > this.difficulties.hard.speed) {
-        this.difficultyText.setText(`LEVEL: EXTREME`);
+      // Update difficulty text if speed exceeds hard level
+      if (this.difficultyText && this.gameSpeed > this.difficulties.hard.speed + 1) {
+        this.difficultyText.setText('LEVEL: EXTREME');
       }
-    } catch (e) {
-      console.error('Error in increaseSpeed method:', e);
     }
   }
 }
+
+export default MainScene;

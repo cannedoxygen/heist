@@ -1,160 +1,223 @@
 import Phaser from 'phaser';
 
-export class Player extends Phaser.Physics.Arcade.Sprite {
+export class Player {
   constructor(scene, x, y) {
-    super(scene, x, y, 'player');
+    this.scene = scene;
     
-    // Add to scene
-    scene.add.existing(this);
-    scene.physics.add.existing(this);
+    // Create sprite
+    if (scene.textures.exists('player')) {
+      this.sprite = scene.add.sprite(x, y, 'player');
+    } else {
+      // Fallback to rectangle if texture doesn't exist
+      this.sprite = scene.add.rectangle(x, y, 40, 40, 0x4f46e5);
+    }
     
-    // Physics properties
-    this.setCollideWorldBounds(true);
-    this.setBounce(0.1);
-    this.setGravityY(1000);
+    // Set sprite properties
+    this.sprite.setDepth(50);
     
-    // Set hitbox
-    this.body.setSize(30, 30);
+    // Player state
+    this.isJumping = false;
+    this.lane = 1; // Default to center lane
     
     // Jump properties
-    this.jumpForce = -500;
+    this.jumpHeight = 100;
+    this.jumpDuration = 500; // ms
     
-    // Visual properties (set these if using a spritesheet)
-    this.setScale(1);
+    // Create trail effect
+    this.createTrailEffect();
     
-    // Animation state
-    this.isJumping = false;
-    this.isRunning = false;
-    
-    // Check if texture has animation frames before creating animations
-    // This helps avoid the error when no proper spritesheet is available
-    if (this.scene.textures.exists('player')) {
-      const texture = this.scene.textures.get('player');
-      // Only create animations if the texture has frames (is a spritesheet)
-      if (texture.frameTotal > 1) {
-        this.createAnimations();
-      } else {
-        console.log('Player texture exists but is not a spritesheet, skipping animations');
+    // Add glow effect
+    this.addGlowEffect();
+  }
+  
+  createTrailEffect() {
+    // Create trail emitter if we have the particle system
+    if (this.scene.particles) {
+      try {
+        this.trailEmitter = this.scene.add.particles(this.sprite.x, this.sprite.y, {
+          frame: ['player'],
+          lifespan: 500,
+          scale: { start: 0.5, end: 0 },
+          alpha: { start: 0.3, end: 0 },
+          speed: 20,
+          quantity: 1,
+          frequency: 100
+        });
+        
+        // Update emitter position on each frame
+        this.scene.events.on('update', () => {
+          this.trailEmitter.setPosition(this.sprite.x, this.sprite.y + 10);
+        });
+      } catch (e) {
+        console.error('Error creating trail effect:', e);
       }
+    } else {
+      // Simple trail effect as fallback
+      this.scene.time.addEvent({
+        delay: 100,
+        callback: this.createTrailParticle,
+        callbackScope: this,
+        loop: true
+      });
     }
   }
   
-  createAnimations() {
+  createTrailParticle() {
+    // Only create trail when moving or jumping
+    if (this.isJumping) {
+      const particle = this.scene.add.rectangle(
+        this.sprite.x,
+        this.sprite.y + 10,
+        10,
+        10,
+        0x4f46e5,
+        0.3
+      );
+      particle.setDepth(40);
+      
+      // Fade out and destroy
+      this.scene.tweens.add({
+        targets: particle,
+        alpha: 0,
+        scaleX: 0.5,
+        scaleY: 0.5,
+        y: particle.y + 20,
+        duration: 300,
+        onComplete: () => {
+          particle.destroy();
+        }
+      });
+    }
+  }
+  
+  addGlowEffect() {
+    // Add a glow behind the player
     try {
-      // Check if animations already exist to avoid duplicate creation
-      const anims = this.scene.anims;
+      this.glow = this.scene.add.ellipse(
+        this.sprite.x,
+        this.sprite.y + 15,
+        60,
+        20,
+        0x4f46e5,
+        0.3
+      );
+      this.glow.setDepth(45);
       
-      if (!anims.exists('player-run')) {
-        console.log('Creating player-run animation');
-        anims.create({
-          key: 'player-run',
-          frames: anims.generateFrameNumbers('player', { start: 0, end: 5 }),
-          frameRate: 12,
-          repeat: -1
-        });
-      }
+      // Pulsing animation for glow
+      this.scene.tweens.add({
+        targets: this.glow,
+        scaleX: 1.2,
+        scaleY: 1.2,
+        alpha: 0.5,
+        duration: 1000,
+        yoyo: true,
+        repeat: -1
+      });
       
-      if (!anims.exists('player-jump')) {
-        console.log('Creating player-jump animation');
-        anims.create({
-          key: 'player-jump',
-          frames: anims.generateFrameNumbers('player', { start: 6, end: 8 }),
-          frameRate: 10,
-          repeat: 0
-        });
-      }
-      
-      // Log success
-      console.log('Player animations created successfully');
+      // Update glow position
+      this.scene.events.on('update', () => {
+        this.glow.x = this.sprite.x;
+        this.glow.y = this.sprite.y + 15;
+      });
     } catch (e) {
-      console.error('Error creating player animations:', e);
+      console.error('Error creating glow effect:', e);
     }
   }
   
   jump() {
-    if (this.body.touching.down) {
-      this.body.setVelocityY(this.jumpForce);
-      this.isJumping = true;
-      
-      // Try to play jump animation only if it exists
-      try {
-        if (this.scene.anims.exists('player-jump')) {
-          this.play('player-jump', true);
-        }
-      } catch (e) {
-        console.error('Error playing jump animation:', e);
-      }
+    if (this.isJumping) return;
+    
+    // Set jumping flag
+    this.isJumping = true;
+    
+    // Play jump sound
+    if (this.scene.sound && this.scene.sound.get('jump')) {
+      this.scene.sound.play('jump', { volume: 0.5 });
     }
+    
+    // Create jump tween
+    this.scene.tweens.add({
+      targets: this.sprite,
+      y: this.sprite.y - this.jumpHeight,
+      duration: this.jumpDuration / 2,
+      ease: 'Sine.easeOut',
+      yoyo: true,
+      onComplete: () => {
+        this.isJumping = false;
+      }
+    });
+    
+    // Add shadow effect during jump
+    this.createJumpShadow();
+  }
+  
+  createJumpShadow() {
+    // Create a shadow underneath during jump
+    const shadow = this.scene.add.ellipse(
+      this.sprite.x,
+      this.sprite.y + 20,
+      30,
+      10,
+      0x000000,
+      0.3
+    );
+    shadow.setDepth(20);
+    
+    // Fade out shadow as player goes higher
+    this.scene.tweens.add({
+      targets: shadow,
+      scaleX: 0.5,
+      scaleY: 0.5,
+      alpha: 0.1,
+      duration: this.jumpDuration / 2,
+      yoyo: true,
+      onComplete: () => {
+        shadow.destroy();
+      }
+    });
+  }
+  
+  moveTo(laneIndex, laneX) {
+    // Update current lane
+    this.lane = laneIndex;
+    
+    // Create tween to move player
+    this.scene.tweens.add({
+      targets: this.sprite,
+      x: laneX,
+      duration: 200,
+      ease: 'Sine.easeInOut'
+    });
   }
   
   update() {
-    // Handle animations based on state
-    try {
-      if (this.body.touching.down) {
-        if (this.isJumping) {
-          this.isJumping = false;
-        }
-        
-        // Play run animation if on ground and animation exists
-        if (!this.isRunning && this.scene.anims.exists('player-run')) {
-          this.play('player-run', true);
-          this.isRunning = true;
-        }
-      } else {
-        // In the air
-        this.isRunning = false;
-      }
-    } catch (e) {
-      console.error('Error in player update animation:', e);
-    }
-    
-    // Add trail effect
-    if (Math.random() > 0.7) {
-      this.createTrail();
+    // Add any per-frame updates here
+    if (Math.random() > 0.95 && !this.isJumping) {
+      // Occasionally play idle animation
+      this.playIdleAnimation();
     }
   }
   
-  createTrail() {
-    try {
-      // Check if particles system exists
-      if (this.scene.particles) {
-        const particles = this.scene.add.particles(this.x, this.y, 'player', {
-          scale: { start: 0.5, end: 0 },
-          alpha: { start: 0.2, end: 0 },
-          tint: 0x4f46e5,
-          speed: 20,
-          lifespan: 300,
-          blendMode: 'ADD',
-          quantity: 1
-        });
-        
-        // Auto-destroy particles
-        this.scene.time.delayedCall(300, () => {
-          particles.destroy();
-        });
-      } else {
-        // Fallback visual effect if particles system isn't available
-        const trailEffect = this.scene.add.rectangle(
-          this.x - 10, 
-          this.y,
-          10,
-          10,
-          0x4f46e5,
-          0.3
-        );
-        
-        // Fade out and destroy
-        this.scene.tweens.add({
-          targets: trailEffect,
-          alpha: 0,
-          duration: 200,
-          onComplete: () => {
-            trailEffect.destroy();
-          }
-        });
-      }
-    } catch (e) {
-      console.error('Error creating player trail:', e);
+  playIdleAnimation() {
+    // Simple idle animation
+    this.scene.tweens.add({
+      targets: this.sprite,
+      y: this.sprite.y - 5,
+      duration: 300,
+      yoyo: true
+    });
+  }
+  
+  destroy() {
+    // Clean up all elements
+    if (this.trailEmitter) {
+      this.trailEmitter.destroy();
     }
+    
+    if (this.glow) {
+      this.glow.destroy();
+    }
+    
+    this.sprite.destroy();
   }
 }
