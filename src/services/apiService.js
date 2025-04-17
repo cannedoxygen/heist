@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient';
+import { supabase } from '../context/supabaseClient';
 
 // API Service for backend interactions
 export const apiService = {

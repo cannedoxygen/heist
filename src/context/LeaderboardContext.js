@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect, useCallback } from 'react';
-import { supabase } from './supabaseClient.js';
+import { supabase } from './supabaseClient';
 
 // Create leaderboard context
 export const LeaderboardContext = createContext(null);

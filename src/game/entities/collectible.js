@@ -11,8 +11,8 @@ export class Collectible {
     this.destroyed = false; // Important flag to prevent double-processing
     
     // Base properties - 4x larger than original
-    this.baseWidth = 80;
-    this.baseHeight = 80;
+    this.baseWidth = 100;
+    this.baseHeight = 100;
     this.glowSize = 120;
     
     // Create sprite

@@ -7,8 +7,8 @@ export class Obstacle {
     this.lane = lane || 0.5; // Lane position (0-1)
     
     // Base properties - 4x larger than original
-    this.baseWidth = 240;
-    this.baseHeight = 160;
+    this.baseWidth = 100;
+    this.baseHeight = 100;
     this.jitterRange = 20; // For glitch effect
     
     // Create sprite

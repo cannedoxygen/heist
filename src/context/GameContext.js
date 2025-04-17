@@ -1,6 +1,7 @@
 // src/context/GameContext.js
 import React, { createContext, useState, useContext, useCallback } from 'react';
 import { WalletContext } from './WalletContext';
+import { leaderboardService } from '../services/leaderboardService';
 
 // Create game context
 export const GameContext = createContext(null);
@@ -19,23 +20,6 @@ export const GameContextProvider = ({ children }) => {
   const [difficulty, setDifficulty] = useState('normal');
   const [volume, setVolume] = useState(0.7);
   const [isMuted, setIsMuted] = useState(false);
-
-  // Implementation without circular dependency
-  const updateLeaderboardScore = async (walletAddress, score) => {
-    try {
-      // This function will be implemented to call your leaderboard service
-      console.log('Updating leaderboard for:', walletAddress, 'with score:', score);
-      
-      // For now, return placeholder values
-      const rank = 1; // This would come from your leaderboard service
-      const isHighScore = true; // This would be determined based on previous scores
-      
-      return { rank, isHighScore };
-    } catch (error) {
-      console.error('Error updating leaderboard:', error);
-      return { rank: null, isHighScore: false };
-    }
-  };
   
   // Start game
   const startGame = useCallback(() => {
@@ -58,19 +42,20 @@ export const GameContextProvider = ({ children }) => {
     
     if (walletAddress && scoreToSubmit > 0) {
       try {
-        const result = await updateLeaderboardScore(walletAddress, scoreToSubmit);
+        // Use leaderboardService directly instead of implementing the logic here
+        const result = await leaderboardService.updateScore(walletAddress, scoreToSubmit);
         setPlayerRank(result.rank);
         setIsHighScore(result.isHighScore);
       } catch (error) {
         console.error('Error updating score:', error);
+        // Add user-friendly error handling
       }
     }
   }, [walletAddress, score]);
   
   // Update score - FIXED to prevent counting twice
   const updateScore = useCallback((points) => {
-    console.log("Updating score by", points, "points");
-    // Simple increment by the exact points received, no magic multiplier
+    // Simple increment by the exact points received
     setScore(prevScore => prevScore + points);
   }, []);
   
@@ -115,8 +100,7 @@ export const GameContextProvider = ({ children }) => {
     toggleMute,
     changeVolume,
     changeDifficulty,
-    restartGame,
-    updateLeaderboardScore
+    restartGame
   };
   
   return (

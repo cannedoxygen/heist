@@ -1,14 +1,12 @@
-// src/game/engine.js - UPDATED
+// src/game/engine.js
 import Phaser from 'phaser';
 import { MainScene } from './scenes/mainScene';
 import { GameOverScene } from './scenes/gameOverScene';
 
 export class GameEngine {
   constructor(containerId, scoreCallback, gameOverCallback) {
-    // Store container ID
+    // Store container ID and callbacks
     this.containerId = containerId || 'game-container';
-    
-    // Store callbacks
     this.scoreCallback = scoreCallback;
     this.gameOverCallback = gameOverCallback;
     
@@ -20,65 +18,68 @@ export class GameEngine {
     this.currentScore = 0;
     this.difficulty = 'normal';
     
-    // Initialize audio settings
+    // Audio settings
     this.isMuted = false;
     this.volume = 0.7;
+    
+    // Event handlers bound to this context for easier removal
+    this.boundHandleResize = this.handleResize.bind(this);
+    this.boundHandleScoreUpdate = this.handleScoreUpdate.bind(this);
+    this.boundHandleGameOver = this.handleGameOver.bind(this);
   }
   
-  // Initialize game with responsive sizing
   init() {
-    console.log('Initializing game engine');
-    
+    // Prevent duplicate initialization
     if (this.game) {
-      console.log('Game already initialized, returning');
       return;
     }
     
-    // Get container element and dimensions
+    // Get container element
     const containerElement = document.getElementById(this.containerId);
     if (!containerElement) {
-      console.error(`Container element with ID "${this.containerId}" not found!`);
-      return;
+      throw new Error(`Container element with ID "${this.containerId}" not found!`);
     }
     
-    // Get actual dimensions of the container
+    // Get container dimensions
     const containerWidth = containerElement.offsetWidth;
     const containerHeight = containerElement.offsetHeight;
     
-    console.log('Container dimensions:', containerWidth, 'x', containerHeight);
-    
-    // Create dynamic game config based on container size
-    const config = {
-      type: Phaser.AUTO,
-      width: containerWidth,
-      height: containerHeight,
-      backgroundColor: '#0a0e17',
-      parent: this.containerId,
-      physics: {
-        default: 'arcade',
-        arcade: {
-          gravity: { y: 0 },
-          debug: false
-        }
-      },
-      scale: {
-        mode: Phaser.Scale.RESIZE,
-        autoCenter: Phaser.Scale.CENTER_BOTH,
-        width: containerWidth,
-        height: containerHeight
-      },
-      render: {
-        pixelArt: false,
-        antialias: true
-      }
-    };
+    // Ensure valid dimensions
+    if (containerWidth <= 0 || containerHeight <= 0) {
+      throw new Error('Container has invalid dimensions. Width and height must be greater than 0.');
+    }
     
     try {
-      // Create new Phaser game
-      console.log('Creating new Phaser game with dimensions:', containerWidth, 'x', containerHeight);
+      // Configure Phaser game instance
+      const config = {
+        type: Phaser.AUTO,
+        width: containerWidth,
+        height: containerHeight,
+        backgroundColor: '#0a0e17',
+        parent: this.containerId,
+        physics: {
+          default: 'arcade',
+          arcade: {
+            gravity: { y: 0 },
+            debug: false
+          }
+        },
+        scale: {
+          mode: Phaser.Scale.RESIZE,
+          autoCenter: Phaser.Scale.CENTER_BOTH,
+          width: containerWidth,
+          height: containerHeight
+        },
+        render: {
+          pixelArt: false,
+          antialias: true
+        }
+      };
+      
+      // Create Phaser game instance
       this.game = new Phaser.Game(config);
       
-      // Store game dimensions in a global property that scenes can access
+      // Store dimensions for scene access
       this.game.gameWidth = containerWidth;
       this.game.gameHeight = containerHeight;
       
@@ -86,47 +87,56 @@ export class GameEngine {
       this.game.scene.add('MainScene', MainScene);
       this.game.scene.add('GameOverScene', GameOverScene);
       
-      // Listen for score updates
-      this.game.events.on('updateScore', this.handleScoreUpdate, this);
+      // Setup event listeners
+      this.setupEventListeners();
       
-      // Listen for game over
-      this.game.events.on('gameOver', this.handleGameOver, this);
-      
-      // Relay events to React components
-      this.setupEventRelay();
-      
-      // Start with main scene
+      // Start main scene
       this.game.scene.start('MainScene', { 
         difficulty: this.difficulty,
         gameWidth: containerWidth,
         gameHeight: containerHeight
       });
-      
-      console.log('Game initialization complete');
     } catch (error) {
-      console.error('Error initializing game:', error);
+      this.handleInitError(error);
+      throw error;
     }
   }
   
-  // Setup event relay to bridge Phaser and React
-  setupEventRelay() {
-    // Handle window resize events
-    window.addEventListener('resize', this.handleResize.bind(this));
+  setupEventListeners() {
+    // Add window resize listener
+    window.addEventListener('resize', this.boundHandleResize);
     
-    // Add custom event handlers if needed
-    if (this.game) {
-      // Example: Forward all relevant events to React
-      ['data-collected', 'obstacle-hit', 'level-up'].forEach(eventName => {
-        this.game.events.on(eventName, (data) => {
-          // Create a custom event that React components can listen for
-          const event = new CustomEvent(`game:${eventName}`, { detail: data });
-          document.dispatchEvent(event);
-        });
-      });
+    // Game event listeners
+    if (this.game && this.game.events) {
+      this.game.events.on('updateScore', this.boundHandleScoreUpdate);
+      this.game.events.on('gameOver', this.boundHandleGameOver);
     }
   }
   
-  // Handle window resize
+  removeEventListeners() {
+    // Remove window listeners
+    window.removeEventListener('resize', this.boundHandleResize);
+    
+    // Remove game listeners
+    if (this.game && this.game.events) {
+      this.game.events.off('updateScore', this.boundHandleScoreUpdate);
+      this.game.events.off('gameOver', this.boundHandleGameOver);
+    }
+  }
+  
+  handleInitError(error) {
+    // Clean up any partial initialization
+    if (this.game) {
+      this.removeEventListeners();
+      try {
+        this.game.destroy(true);
+      } catch (destroyError) {
+        // Ignore additional errors during cleanup
+      }
+      this.game = null;
+    }
+  }
+  
   handleResize() {
     if (!this.game) return;
     
@@ -136,8 +146,6 @@ export class GameEngine {
     const width = containerElement.offsetWidth;
     const height = containerElement.offsetHeight;
     
-    console.log('Resizing game to:', width, 'x', height);
-    
     // Update game dimensions
     this.game.scale.resize(width, height);
     
@@ -145,19 +153,15 @@ export class GameEngine {
     this.game.gameWidth = width;
     this.game.gameHeight = height;
     
-    // Notify scenes about resize if they have a handleResize method
+    // Notify current scene
     const activeScene = this.game.scene.getScenes(true)[0];
     if (activeScene && typeof activeScene.handleResize === 'function') {
       activeScene.handleResize(width, height);
     }
   }
   
-  // Start game
   start(difficulty = 'normal') {
-    console.log('Starting game with difficulty:', difficulty);
-    
     if (!this.game) {
-      console.log('Game not initialized, initializing now');
       this.init();
     }
     
@@ -170,55 +174,43 @@ export class GameEngine {
     const width = containerElement ? containerElement.offsetWidth : 800;
     const height = containerElement ? containerElement.offsetHeight : 400;
     
-    // Start main scene with difficulty and dimensions
+    // Start main scene
     this.game.scene.start('MainScene', { 
       difficulty,
       gameWidth: width,
       gameHeight: height
     });
-    
-    console.log('Game started');
   }
   
-  // Stop game
   stop() {
-    console.log('Stopping game');
-    
     if (this.game && this.isRunning) {
       this.isRunning = false;
       this.game.scene.stop('MainScene');
-      console.log('Game stopped');
-    } else {
-      console.log('Game not running, nothing to stop');
     }
   }
   
-  // Handle score updates
   handleScoreUpdate(points) {
-    this.currentScore += points;
-    
-    // Call external score callback if provided
-    if (this.scoreCallback) {
-      this.scoreCallback(this.currentScore);
+    // Only update score if a valid points value is provided
+    if (typeof points === 'number' && !isNaN(points)) {
+      this.currentScore += points;
+      
+      // Call external callback
+      if (typeof this.scoreCallback === 'function') {
+        this.scoreCallback(points);
+      }
     }
   }
   
-  // Handle game over
   handleGameOver(finalScore) {
-    console.log('Game over handler called with score:', finalScore);
-    
     this.isRunning = false;
     
-    // Call external game over callback if provided
-    if (this.gameOverCallback) {
-      console.log('Calling game over callback');
-      this.gameOverCallback(finalScore);
-    } else {
-      console.log('No game over callback provided');
+    // Call external callback with validated score
+    if (typeof this.gameOverCallback === 'function') {
+      const validScore = finalScore !== undefined ? finalScore : this.currentScore;
+      this.gameOverCallback(validScore);
     }
   }
   
-  // Set game volume
   setVolume(volume) {
     this.volume = volume;
     
@@ -227,7 +219,6 @@ export class GameEngine {
     }
   }
   
-  // Toggle mute
   toggleMute() {
     this.isMuted = !this.isMuted;
     
@@ -236,31 +227,31 @@ export class GameEngine {
     }
   }
   
-  // Resize game
   resize() {
     this.handleResize();
   }
   
-  // Destroy game instance
   destroy() {
-    console.log('Destroying game instance');
+    // Prevent errors on destroy if already destroyed
+    if (!this.game) return;
     
-    if (this.game) {
-      // Remove event listeners
-      window.removeEventListener('resize', this.handleResize);
-      this.game.events.off('updateScore');
-      this.game.events.off('gameOver');
+    // Clean up all resources
+    this.removeEventListeners();
+    
+    try {
+      // Stop all running scenes
+      this.game.scene.scenes.forEach(scene => {
+        if (scene.scene.isActive()) {
+          this.game.scene.stop(scene.scene.key);
+        }
+      });
       
-      try {
-        // Try to destroy the Phaser game
-        this.game.destroy(true);
-        this.game = null;
-        console.log('Game instance destroyed');
-      } catch (error) {
-        console.error('Error destroying game:', error);
-      }
-    } else {
-      console.log('No game instance to destroy');
+      // Destroy the game instance
+      this.game.destroy(true);
+      this.game = null;
+    } catch (error) {
+      // Ignore errors during destroy
+      this.game = null;
     }
   }
 }

@@ -3,67 +3,46 @@ import Phaser from 'phaser';
 export class GameOverScene extends Phaser.Scene {
   constructor() {
     super('GameOverScene');
-    
     this.score = 0;
   }
   
   init(data) {
-    this.score = data.score || 0;
+    // Store the final score
+    this.score = data?.score || 0;
+    
+    // Ensure buttons aren't already bound to prevent memory leaks
+    this.input.keyboard.off('keydown-SPACE');
   }
   
   create() {
     const { width, height } = this.cameras.main;
     
-    // Add background
-    this.add.rectangle(0, 0, width, height, 0x0a0e17).setOrigin(0);
-    
-    // Add grid effect background (simplified version)
-    this.createGridBackground();
-    
-    // Add corrupted data effect
-    this.createCorruptedData();
-    
-    // Game over container
-    const gameOverContainer = this.add.container(width / 2, height / 2 - 50);
-    
-    // Add game over text with glitch effect
-    const gameOverText = this.add.text(0, 0, 'GAME OVER', {
-      fontFamily: 'Orbitron, sans-serif',
-      fontSize: '48px',
-      color: '#ef4444',
-      stroke: '#000000',
-      strokeThickness: 6
-    }).setOrigin(0.5);
-    
-    // Add score text
-    const scoreText = this.add.text(0, 80, `SCORE: ${this.score}`, {
-      fontFamily: 'Orbitron, sans-serif',
-      fontSize: '32px',
-      color: '#e0e7ff'
-    }).setOrigin(0.5);
-    
-    gameOverContainer.add([gameOverText, scoreText]);
-    
-    // Apply glitch effect to game over text
-    this.glitchEffect(gameOverText);
-    
-    // Create buttons
+    // Setup scene elements
+    this.createBackground(width, height);
+    this.createGameOverUI(width, height);
     this.createButtons();
     
-    // Add input events
-    this.input.keyboard.on('keydown-SPACE', this.restartGame, this);
+    // Setup input handlers
+    this.setupInputHandlers();
     
-    // Send score to React component
+    // Send final score to React component
     this.sendScoreToReact();
   }
   
-  createGridBackground() {
-    const { width, height } = this.cameras.main;
+  createBackground(width, height) {
+    // Background color
+    this.add.rectangle(0, 0, width, height, 0x0a0e17).setOrigin(0);
     
+    // Create grid effect
+    this.createGridBackground(width, height);
+    
+    // Add corrupted data effect
+    this.createCorruptedData();
+  }
+  
+  createGridBackground(width, height) {
     // Create grid with perspective effect
     const gridGraphics = this.add.graphics();
-    
-    // Set line style
     gridGraphics.lineStyle(1, 0x1d2837, 0.3);
     
     // Draw horizontal grid lines
@@ -96,30 +75,25 @@ export class GameOverScene extends Phaser.Scene {
   }
   
   createCorruptedData() {
-    // Add corrupted data particles in the background
+    // Create data particles pool for reuse
+    this.dataParticles = this.add.group();
+    
+    // Add initial particles
     for (let i = 0; i < 30; i++) {
-      const x = Phaser.Math.Between(0, this.cameras.main.width);
-      const y = Phaser.Math.Between(0, this.cameras.main.height);
-      const size = Phaser.Math.Between(3, 8);
-      
-      const rect = this.add.rectangle(x, y, size, size, 0xef4444, 0.5);
-      
-      // Random movement
-      this.tweens.add({
-        targets: rect,
-        x: x + Phaser.Math.Between(-100, 100),
-        y: y + Phaser.Math.Between(-100, 100),
-        alpha: { from: 0.5, to: 0 },
-        duration: Phaser.Math.Between(1000, 3000),
-        onComplete: () => {
-          rect.destroy();
-          // Only create new data if scene is still active
-          if (this.scene.isActive('GameOverScene')) {
-            this.createDataParticle();
-          }
-        }
-      });
+      this.createDataParticle();
     }
+    
+    // Set up recurring creation of particles
+    this.time.addEvent({
+      delay: 500,
+      callback: () => {
+        // Only create new particles if scene is active
+        if (this.scene.isActive('GameOverScene')) {
+          this.createDataParticle();
+        }
+      },
+      loop: true
+    });
   }
   
   createDataParticle() {
@@ -128,7 +102,24 @@ export class GameOverScene extends Phaser.Scene {
     const y = Phaser.Math.Between(0, height);
     const size = Phaser.Math.Between(3, 8);
     
-    const rect = this.add.rectangle(x, y, size, size, 0xef4444, 0.5);
+    // Create or reuse particle
+    let rect;
+    if (this.dataParticles.countActive(true) < 50) {
+      rect = this.add.rectangle(x, y, size, size, 0xef4444, 0.5);
+      this.dataParticles.add(rect);
+    } else {
+      rect = this.dataParticles.getFirstDead(true, x, y, size, size);
+      if (rect) {
+        rect.setFillStyle(0xef4444, 0.5);
+        rect.setActive(true);
+        rect.setVisible(true);
+      } else {
+        rect = this.add.rectangle(x, y, size, size, 0xef4444, 0.5);
+        this.dataParticles.add(rect);
+      }
+    }
+    
+    if (!rect) return;
     
     // Random movement
     this.tweens.add({
@@ -138,18 +129,43 @@ export class GameOverScene extends Phaser.Scene {
       alpha: { from: 0.5, to: 0 },
       duration: Phaser.Math.Between(1000, 3000),
       onComplete: () => {
-        rect.destroy();
-        // Only create new data if scene is still active
-        if (this.scene.isActive('GameOverScene')) {
-          this.createDataParticle();
-        }
+        // Mark as inactive instead of destroying
+        rect.setActive(false);
+        rect.setVisible(false);
       }
     });
   }
   
-  glitchEffect(target) {
-    // Create glitch effect with random offsets
-    this.time.addEvent({
+  createGameOverUI(width, height) {
+    // Game over container for organizing elements
+    const gameOverContainer = this.add.container(width / 2, height / 2 - 50);
+    
+    // Game over text with glitch effect
+    const gameOverText = this.add.text(0, 0, 'GAME OVER', {
+      fontFamily: 'Orbitron, sans-serif',
+      fontSize: '48px',
+      color: '#ef4444',
+      stroke: '#000000',
+      strokeThickness: 6
+    }).setOrigin(0.5);
+    
+    // Score text
+    const scoreText = this.add.text(0, 80, `SCORE: ${this.score}`, {
+      fontFamily: 'Orbitron, sans-serif',
+      fontSize: '32px',
+      color: '#e0e7ff'
+    }).setOrigin(0.5);
+    
+    // Add to container
+    gameOverContainer.add([gameOverText, scoreText]);
+    
+    // Apply glitch effect to game over text
+    this.applyGlitchEffect(gameOverText);
+  }
+  
+  applyGlitchEffect(target) {
+    // Glitch effect with random offsets
+    this.glitchTimer = this.time.addEvent({
       delay: 100,
       callback: () => {
         if (Math.random() > 0.8) {
@@ -182,51 +198,38 @@ export class GameOverScene extends Phaser.Scene {
   createButtons() {
     const { width, height } = this.cameras.main;
     
-    // Restart button
-    const restartButton = this.add.rectangle(
-      width / 2,
-      height - 150,
-      200,
-      50,
-      0x4f46e5
-    ).setInteractive();
+    // Button container for organization
+    const buttonContainer = this.add.container(width / 2, height - 115);
     
-    const restartText = this.add.text(
-      width / 2,
-      height - 150,
-      'PLAY AGAIN',
-      {
-        fontFamily: 'Orbitron, sans-serif',
-        fontSize: '18px',
-        color: '#ffffff'
-      }
-    ).setOrigin(0.5);
+    // Restart button
+    const restartButton = this.add.rectangle(0, 0, 200, 50, 0x4f46e5)
+      .setInteractive()
+      .on('pointerdown', this.restartGame, this);
+    
+    const restartText = this.add.text(0, 0, 'PLAY AGAIN', {
+      fontFamily: 'Orbitron, sans-serif',
+      fontSize: '18px',
+      color: '#ffffff'
+    }).setOrigin(0.5);
     
     // Leaderboard button
-    const leaderboardButton = this.add.rectangle(
-      width / 2,
-      height - 80,
-      200,
-      50,
-      0x141c2b
-    ).setInteractive();
+    const leaderboardButton = this.add.rectangle(0, 70, 200, 50, 0x141c2b)
+      .setInteractive()
+      .on('pointerdown', this.viewLeaderboard, this);
     
-    const leaderboardText = this.add.text(
-      width / 2,
-      height - 80,
-      'LEADERBOARD',
-      {
-        fontFamily: 'Orbitron, sans-serif',
-        fontSize: '18px',
-        color: '#a9b4d1'
-      }
-    ).setOrigin(0.5);
+    const leaderboardText = this.add.text(0, 70, 'LEADERBOARD', {
+      fontFamily: 'Orbitron, sans-serif',
+      fontSize: '18px',
+      color: '#a9b4d1'
+    }).setOrigin(0.5);
     
-    // Button interactions
-    restartButton.on('pointerdown', this.restartGame, this);
-    leaderboardButton.on('pointerdown', this.viewLeaderboard, this);
+    // Add to container
+    buttonContainer.add([
+      restartButton, restartText,
+      leaderboardButton, leaderboardText
+    ]);
     
-    // Hover effects
+    // Add hover effects
     this.addButtonHoverEffects(restartButton, restartText);
     this.addButtonHoverEffects(leaderboardButton, leaderboardText);
   }
@@ -243,13 +246,35 @@ export class GameOverScene extends Phaser.Scene {
     });
   }
   
+  setupInputHandlers() {
+    // Space key to restart
+    this.input.keyboard.once('keydown-SPACE', this.restartGame, this);
+    
+    // ESC key to go to leaderboard
+    this.input.keyboard.once('keydown-ESC', this.viewLeaderboard, this);
+    
+    // Touch handler for mobile
+    this.input.on('pointerdown', (pointer) => {
+      // Double tap to restart
+      if (pointer.downTime - (pointer.previousDownTime || 0) < 300) {
+        this.restartGame();
+      }
+    });
+  }
+  
   restartGame() {
-    // Restart main game scene
+    // Cleanup first
+    this.cleanup();
+    
+    // Restart main scene
     this.scene.start('MainScene');
   }
   
   viewLeaderboard() {
-    // Send event to React to show leaderboard
+    // Cleanup first
+    this.cleanup();
+    
+    // Emit event to React to show leaderboard
     if (this.game.events) {
       this.game.events.emit('viewLeaderboard');
     }
@@ -265,6 +290,28 @@ export class GameOverScene extends Phaser.Scene {
     if (this.game.events) {
       this.game.events.emit('gameOver', this.score);
     }
+  }
+  
+  cleanup() {
+    // Stop all timers
+    if (this.glitchTimer) {
+      this.glitchTimer.remove();
+    }
+    
+    // Stop all tweens
+    this.tweens.killAll();
+    
+    // Clear all input handlers
+    this.input.keyboard.off('keydown-SPACE', this.restartGame, this);
+    this.input.keyboard.off('keydown-ESC', this.viewLeaderboard, this);
+  }
+  
+  shutdown() {
+    // Ensure proper cleanup
+    this.cleanup();
+    
+    // Call parent shutdown
+    super.shutdown();
   }
 }
 
