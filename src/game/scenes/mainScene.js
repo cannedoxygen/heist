@@ -1,3 +1,4 @@
+// src/game/scenes/mainScene.js
 import Phaser from 'phaser';
 import { TronGrid } from '../TronGrid';
 
@@ -59,6 +60,21 @@ export class MainScene extends Phaser.Scene {
       this.difficulty = data.difficulty;
     }
     
+    // Get game dimensions from data or from game instance
+    if (data && data.gameWidth && data.gameHeight) {
+      this.gameWidth = data.gameWidth;
+      this.gameHeight = data.gameHeight;
+    } else if (this.game.gameWidth && this.game.gameHeight) {
+      this.gameWidth = this.game.gameWidth;
+      this.gameHeight = this.game.gameHeight;
+    } else {
+      // Fallback dimensions if nothing provided
+      this.gameWidth = this.cameras.main.width;
+      this.gameHeight = this.cameras.main.height;
+    }
+    
+    console.log("MainScene initialized with dimensions:", this.gameWidth, "x", this.gameHeight);
+    
     // Set game parameters based on difficulty
     this.gameSpeed = this.difficulties[this.difficulty].speed;
     this.obstacleInterval = this.difficulties[this.difficulty].obstacleInterval;
@@ -68,6 +84,53 @@ export class MainScene extends Phaser.Scene {
     this.currentLane = 1;
   }
   
+  // Handle resize events
+  handleResize(width, height) {
+    this.gameWidth = width;
+    this.gameHeight = height;
+    
+    console.log("MainScene handling resize to:", width, "x", height);
+    
+    // Update UI elements positions if they exist
+    if (this.scoreText) {
+      this.scoreText.setPosition(20, 20);
+    }
+    
+    if (this.difficultyText) {
+      this.difficultyText.setPosition(width - 20, 20);
+    }
+    
+    // Recreate the TronGrid with new dimensions
+    if (this.tronGrid) {
+      this.tronGrid.destroy();
+      this.tronGrid = new TronGrid(this, {
+        horizonY: height * 0.35,
+        gridWidth: width * 0.8,
+        gridWidthAtHorizon: 60,
+        color: 0x4f46e5,
+        lineAlpha: 0.8,
+        horizontalLines: 20,
+        verticalLines: 10,
+        scrollSpeed: 2,
+        lineWidth: 2
+      });
+    }
+    
+    // Update player position
+    if (this.player) {
+      const playerY = height - 80;
+      this.player.y = playerY;
+      
+      // Update player glow if it exists
+      if (this.playerGlow) {
+        this.playerGlow.y = playerY + 20;
+      }
+      
+      // Make sure player is in the correct lane
+      this.movePlayerToLane(this.currentLane);
+    }
+  }
+  
   preload() {
     console.log('Preloading assets...');
     
@@ -75,11 +138,13 @@ export class MainScene extends Phaser.Scene {
     const progressBar = this.add.graphics();
     const progressBox = this.add.graphics();
     progressBox.fillStyle(0x222222, 0.8);
-    progressBox.fillRect(240, 270, 320, 50);
     
-    const width = this.cameras.main.width;
-    const height = this.cameras.main.height;
-    const loadingText = this.add.text(width / 2, height / 2 - 50, 'Loading...', {
+    const width = this.gameWidth || this.cameras.main.width;
+    const height = this.gameHeight || this.cameras.main.height;
+    
+    progressBox.fillRect(width * 0.25, height * 0.45, width * 0.5, height * 0.1);
+    
+    const loadingText = this.add.text(width / 2, height * 0.4, 'Loading...', {
       font: '20px monospace',
       fill: '#ffffff'
     });
@@ -89,7 +154,7 @@ export class MainScene extends Phaser.Scene {
     this.load.on('progress', (value) => {
       progressBar.clear();
       progressBar.fillStyle(0xffffff, 1);
-      progressBar.fillRect(250, 280, 300 * value, 30);
+      progressBar.fillRect(width * 0.26, height * 0.46, width * 0.48 * value, height * 0.08);
     });
     
     this.load.on('complete', () => {
@@ -122,178 +187,13 @@ export class MainScene extends Phaser.Scene {
     }
   }
   
-  create() {
-    console.log('Creating game scene');
-    
-    // Get game dimensions
-    this.gameWidth = this.cameras.main.width;
-    this.gameHeight = this.cameras.main.height;
-    
-    // Create fallback assets if needed
-    this.createFallbackAssets();
-    
-    // Create the 3D perspective Tron grid
-    this.tronGrid = new TronGrid(this, {
-      horizonY: this.gameHeight * 0.35,       // Position horizon at 35% from top
-      gridWidth: this.gameWidth * 0.8,        // 80% of screen width at bottom
-      gridWidthAtHorizon: 60,                 // Narrow at horizon
-      color: 0x4f46e5,                        // Tron blue
-      lineAlpha: 0.8,                         // Semi-transparent
-      horizontalLines: 20,                    // More horizontal lines for smoother effect
-      verticalLines: 10,                      // Number of vertical lines
-      scrollSpeed: 2,                         // How fast grid moves toward viewer
-      lineWidth: 2                            // Line thickness
-    });
-    
-    // Set background color
-    this.cameras.main.setBackgroundColor(0x0a0e17); // Dark blue background
-    
-    // Create player character
-    this.createPlayer();
-    
-    // Add score text
-    this.scoreText = this.add.text(20, 20, 'SCORE: 0', {
-      fontSize: '24px',
-      fontFamily: 'Orbitron, sans-serif',
-      color: '#e0e7ff',
-      stroke: '#000000',
-      strokeThickness: 3
-    }).setScrollFactor(0).setDepth(100);
-    
-    // Add difficulty text
-    this.difficultyText = this.add.text(
-      this.gameWidth - 20, 
-      20, 
-      `LEVEL: ${this.difficulty.toUpperCase()}`, 
-      {
-        fontSize: '18px',
-        fontFamily: 'Orbitron, sans-serif',
-        color: '#a9b4d1',
-        stroke: '#000000',
-        strokeThickness: 3
-      }
-    ).setScrollFactor(0).setOrigin(1, 0).setDepth(100);
-    
-    // Setup input for jumping
-    this.input.on('pointerdown', this.jump, this);
-    this.input.keyboard.on('keydown-SPACE', this.jump, this);
-    
-    // Add keyboard controls for left/right movement
-    this.cursors = this.input.keyboard.createCursorKeys();
-    
-    // Start game
-    this.isGameOver = false;
-    this.spawnTimer = this.obstacleInterval;
-    this.dataSpawnTimer = this.dataInterval;
-    
-    // Add some initial objects
-    for (let i = 0; i < 10; i++) {
-      const z = 200 + (i * 100);
-      if (i % 3 === 0) {
-        this.spawnObstacleAtDistance(z);
-      } else {
-        this.spawnCollectibleAtDistance(z);
-      }
-    }
-    
-    // Speed increase over time
-    this.time.addEvent({
-      delay: 10000, // 10 seconds
-      callback: this.increaseSpeed,
-      callbackScope: this,
-      loop: true
-    });
-    
-    console.log('Game scene created successfully');
-  }
-  
-  update(time, delta) {
-    if (this.isGameOver) return;
-    
-    // Update the Tron grid
-    if (this.tronGrid) {
-      this.tronGrid.update(delta);
-    }
-    
-    // Update player glow position
-    if (this.playerGlow && this.player) {
-      this.playerGlow.x = this.player.x;
-      this.playerGlow.y = this.player.y + 20;
-    }
-    
-    // Handle keyboard input
-    if (this.cursors && Phaser.Input.Keyboard.JustDown(this.cursors.left)) {
-      this.moveLeft();
-    } else if (this.cursors && Phaser.Input.Keyboard.JustDown(this.cursors.right)) {
-      this.moveRight();
-    }
-    
-    // Spawn timers
-    this.spawnTimer -= delta;
-    if (this.spawnTimer <= 0) {
-      this.spawnObstacle();
-      this.spawnTimer = this.obstacleInterval;
-    }
-    
-    this.dataSpawnTimer -= delta;
-    if (this.dataSpawnTimer <= 0) {
-      this.spawnCollectible();
-      this.dataSpawnTimer = this.dataInterval;
-    }
-    
-    // Filter out collected objects from our processing arrays
-    if (Array.isArray(this.objectsPool)) {
-      this.objectsPool = this.objectsPool.filter(obj => {
-        // Skip undefined objects
-        if (!obj) return false;
-        
-        // If this is a collected object, destroy its sprite and remove from pool
-        if (obj.type === 'collectible' && obj.collected) {
-          return false; // remove from pool
-        }
-        
-        // Update z position (moving closer to the camera)
-        obj.z -= this.gameSpeed * (delta / 16.667);
-        
-        // If object has passed the camera, destroy and remove
-        if (obj.z <= 0) {
-          if (obj.sprite) {
-            obj.sprite.destroy();
-          }
-          return false; // remove from pool
-        }
-        
-        // Update visual properties based on z-distance
-        this.updateObjectVisuals(obj);
-        
-        // Check for collisions with player
-        if (obj.z < 50 && obj.z > 30) {
-          // Calculate lane of object
-          const objLaneIndex = Math.round(obj.lane * (this.lanes.length - 1));
-          
-          if (objLaneIndex === this.currentLane) {
-            if (obj.type === 'collectible' && !obj.collected) {
-              // Collect data
-              this.collectData(obj);
-              // Don't remove from array yet, just mark as collected
-            } else if (obj.type === 'obstacle' && this.player && !this.player.isJumping && !obj.hit) {
-              // Hit obstacle - only if not already hit
-              this.hitObstacle(obj);
-            }
-          }
-        }
-        
-        return true; // keep in pool
-      });
-    }
-  }
-  
+  // Create fallback assets when images fail to load
   createFallbackAssets() {
-    // Define sizes for fallback textures
-    const playerSize = 160;
-    const obstacleWidth = 240;
-    const obstacleHeight = 160;
-    const collectibleSize = 80;
+    // Define sizes for fallback textures - make them responsive
+    const playerSize = Math.min(this.gameHeight * 0.2, this.gameWidth * 0.15);
+    const obstacleWidth = playerSize * 1.5; 
+    const obstacleHeight = playerSize;
+    const collectibleSize = playerSize * 0.5;
   
     // Create fallback textures if needed
     try {
@@ -336,31 +236,104 @@ export class MainScene extends Phaser.Scene {
     }
   }
   
+  create() {
+    console.log('Creating game scene');
+    
+    // Ensure we have dimensions
+    this.gameWidth = this.gameWidth || this.cameras.main.width;
+    this.gameHeight = this.gameHeight || this.cameras.main.height;
+    
+    console.log("Creating scene with dimensions:", this.gameWidth, "x", this.gameHeight);
+    
+    // Create fallback assets if needed
+    this.createFallbackAssets();
+    
+    // Create the 3D perspective Tron grid
+    this.tronGrid = new TronGrid(this, {
+      horizonY: this.gameHeight * 0.35,       // Position horizon at 35% from top
+      gridWidth: this.gameWidth * 0.8,        // 80% of screen width at bottom
+      gridWidthAtHorizon: 60,                 // Narrow at horizon
+      color: 0x4f46e5,                        // Tron blue
+      lineAlpha: 0.8,                         // Semi-transparent
+      horizontalLines: 20,                    // More horizontal lines for smoother effect
+      verticalLines: 10,                      // Number of vertical lines
+      scrollSpeed: 2,                         // How fast grid moves toward viewer
+      lineWidth: 2                            // Line thickness
+    });
+    
+    // Set background color
+    this.cameras.main.setBackgroundColor(0x0a0e17); // Dark blue background
+    
+    // Create player character
+    this.createPlayer();
+    
+    // IMPORTANT FIX: Don't create UI elements in Phaser since React handles them
+    // Set to null to avoid errors elsewhere in the code
+    this.scoreText = null;
+    this.difficultyText = null;
+    
+    // Setup input for jumping
+    this.input.on('pointerdown', this.jump, this);
+    this.input.keyboard.on('keydown-SPACE', this.jump, this);
+    
+    // Add keyboard controls for left/right movement
+    this.cursors = this.input.keyboard.createCursorKeys();
+    
+    // Start game
+    this.isGameOver = false;
+    this.spawnTimer = this.obstacleInterval;
+    this.dataSpawnTimer = this.dataInterval;
+    
+    // Add some initial objects
+    for (let i = 0; i < 10; i++) {
+      const z = 200 + (i * 100);
+      if (i % 3 === 0) {
+        this.spawnObstacleAtDistance(z);
+      } else {
+        this.spawnCollectibleAtDistance(z);
+      }
+    }
+    
+    // Speed increase over time
+    this.time.addEvent({
+      delay: 10000, // 10 seconds
+      callback: this.increaseSpeed,
+      callbackScope: this,
+      loop: true
+    });
+    
+    console.log('Game scene created successfully');
+  }
+  
   createPlayer() {
     // Player is positioned at the bottom center of the screen
     const playerX = this.gameWidth / 2;
     const playerY = this.gameHeight - 80; // A bit up from the bottom
     
+    // Calculate appropriate player size based on screen dimensions
+    // This makes player size responsive to screen size
+    const size = Math.min(this.gameHeight * 0.2, this.gameWidth * 0.15);
+    
     // If player texture exists, use it; otherwise create a simple sprite
     if (this.textures.exists('player')) {
       this.player = this.add.sprite(playerX, playerY, 'player');
-      this.player.setDisplaySize(280, 280);
+      this.player.setDisplaySize(size, size);
     } else {
-      this.player = this.add.rectangle(playerX, playerY, 280, 280, 0x4f46e5);
+      this.player = this.add.rectangle(playerX, playerY, size, size, 0x4f46e5);
     }
     
     // Set player properties
     this.player.setDepth(50);
     this.player.isJumping = false;
-    this.player.jumpHeight = 100;
+    this.player.jumpHeight = this.gameHeight * 0.15; // Responsive jump height
     this.player.jumpDuration = 500;
     
     // Add glow effect to make player more visible
     this.playerGlow = this.add.ellipse(
       playerX,
       playerY + 20,
-      360,
-      120,
+      size * 1.5,
+      size * 0.5,
       0x4f46e5,
       0.4
     );
@@ -379,6 +352,97 @@ export class MainScene extends Phaser.Scene {
     // Set current lane (center by default)
     this.currentLane = 1;
     this.movePlayerToLane(1); // Ensure player is centered
+  }
+  
+  update(time, delta) {
+    if (this.isGameOver) return;
+    
+    // Store current lane to detect any unexpected changes
+    const savedLane = this.currentLane;
+    
+    // Update the Tron grid
+    if (this.tronGrid) {
+      this.tronGrid.update(delta);
+    }
+    
+    // Update player glow position
+    if (this.playerGlow && this.player) {
+      this.playerGlow.x = this.player.x;
+      this.playerGlow.y = this.player.y + 20;
+    }
+    
+    // Handle keyboard input
+    if (this.cursors && Phaser.Input.Keyboard.JustDown(this.cursors.left)) {
+      this.moveLeft();
+    } else if (this.cursors && Phaser.Input.Keyboard.JustDown(this.cursors.right)) {
+      this.moveRight();
+    }
+    
+    // Spawn timers
+    this.spawnTimer -= delta;
+    if (this.spawnTimer <= 0) {
+      this.spawnObstacle();
+      this.spawnTimer = this.obstacleInterval;
+    }
+    
+    this.dataSpawnTimer -= delta;
+    if (this.dataSpawnTimer <= 0) {
+      this.spawnCollectible();
+      this.dataSpawnTimer = this.dataInterval;
+    }
+    
+    // Filter out collected objects from our processing arrays
+    if (Array.isArray(this.objectsPool)) {
+      this.objectsPool = this.objectsPool.filter(obj => {
+        // Skip undefined objects or already destroyed objects
+        if (!obj || obj.destroyed) return false;
+        
+        // If this is a collected object, remove from pool
+        if (obj.type === 'collectible' && obj.collected) {
+          return false;
+        }
+        
+        // Update z position (moving closer to the camera)
+        obj.z -= this.gameSpeed * (delta / 16.667);
+        
+        // If object has passed the camera, destroy and remove
+        if (obj.z <= 0) {
+          if (obj.sprite) {
+            obj.sprite.destroy();
+          }
+          return false; // remove from pool
+        }
+        
+        // Update visual properties based on z-distance
+        this.updateObjectVisuals(obj);
+        
+        // Check for collisions with player
+        if (obj.z < 50 && obj.z > 30) {
+          // Calculate lane of object
+          const objLaneIndex = Math.round(obj.lane * (this.lanes.length - 1));
+          
+          if (objLaneIndex === this.currentLane) {
+            if (obj.type === 'collectible' && !obj.collected) {
+              // Collect data
+              this.collectData(obj);
+            } else if (obj.type === 'obstacle' && this.player && !this.player.isJumping && !obj.hit) {
+              // Hit obstacle - only if not already hit
+              this.hitObstacle(obj);
+            }
+          }
+        }
+        
+        return true; // keep in pool
+      });
+    }
+    
+    // IMPORTANT FIX: Ensure lane position wasn't accidentally changed
+    if (this.currentLane !== savedLane) {
+      console.log("Lane was accidentally changed from", savedLane, "to", this.currentLane);
+      this.currentLane = savedLane;
+      // Update player position to correct lane
+      this.movePlayerToLane(savedLane);
+    }
   }
   
   jump() {
@@ -428,8 +492,8 @@ export class MainScene extends Phaser.Scene {
     const jumpEffect = this.add.ellipse(
       this.player.x,
       this.player.y + 35,
-      320,
-      80,
+      this.player.displayWidth * 1.2,
+      this.player.displayHeight * 0.3,
       0x4f46e5,
       0.6
     );
@@ -572,9 +636,10 @@ export class MainScene extends Phaser.Scene {
       sprite: sprite,
       lane: laneIndex / (this.lanes.length - 1), // Normalize to 0-1
       z: z,
-      baseWidth: 320,
-      baseHeight: 240,
-      hit: false
+      baseWidth: Math.min(this.gameHeight * 0.15, this.gameWidth * 0.2) * 1.5,
+      baseHeight: Math.min(this.gameHeight * 0.15, this.gameWidth * 0.2),
+      hit: false,
+      destroyed: false
     };
     
     if (Array.isArray(this.objectsPool)) {
@@ -641,9 +706,10 @@ export class MainScene extends Phaser.Scene {
       sprite: sprite,
       lane: laneIndex / (this.lanes.length - 1), // Normalize to 0-1
       z: z,
-      baseWidth: 120,
-      baseHeight: 120,
-      collected: false
+      baseWidth: Math.min(this.gameHeight * 0.08, this.gameWidth * 0.08),
+      baseHeight: Math.min(this.gameHeight * 0.08, this.gameWidth * 0.08),
+      collected: false,
+      destroyed: false
     };
     
     if (Array.isArray(this.objectsPool)) {
@@ -659,7 +725,8 @@ export class MainScene extends Phaser.Scene {
     
     // Skip if this object has been collected
     if ((obj.type === 'collectible' && obj.collected) || 
-        (obj.sprite && !obj.sprite.visible)) {
+        (obj.sprite && !obj.sprite.visible) || 
+        obj.destroyed) {
       return;
     }
     
@@ -699,44 +766,52 @@ export class MainScene extends Phaser.Scene {
   collectData(obj) {
     if (!obj || !obj.sprite) return;
     
-    // Immediately prevent any duplicate collection
-    if (obj.collected) return;
+    // IMPORTANT FIX: Store current lane before doing ANYTHING
+    const currentLane = this.currentLane;
     
-    // Mark as collected
+    // Immediately prevent any duplicate collection
+    if (obj.collected || obj.destroyed) return;
+    
+    // Mark as collected and destroyed
     obj.collected = true;
+    obj.destroyed = true;
     
     // Play sound
     if (this.sound && this.sound.get('collect')) {
       this.sound.play('collect', { volume: 0.5 });
     }
     
-    // Update score
-    this.score += 10;
-    if (this.scoreText) {
-      this.scoreText.setText(`SCORE: ${this.score}`);
-    }
+    // IMPORTANT FIX: Don't update internal score in Phaser, let React handle it
+    // REMOVED: this.score += 10;
+    
+    // Just emit the event for React to handle
+    this.game.events.emit('updateScore', 10);
     
     // Hide the sprite immediately to prevent visual glitches
     obj.sprite.visible = false;
     
-    // Create particle effect directly
+    // Create particle effect
     this.createCollectParticles(obj.sprite.x, obj.sprite.y);
     
-    // Visual feedback on score
-    if (this.scoreText) {
-      this.tweens.add({
-        targets: this.scoreText,
-        scale: { from: 1.2, to: 1 },
-        duration: 200,
-        ease: 'Sine.easeOut'
-      });
-    }
+    // Schedule sprite destruction after a short delay to prevent visual glitches
+    this.time.delayedCall(50, () => {
+      if (obj.sprite) {
+        obj.sprite.destroy();
+        obj.sprite = null;
+      }
+    });
+    
+    // IMPORTANT FIX: Force lane position to remain the same
+    this.currentLane = currentLane;
   }
   
   createCollectParticles(x, y) {
+    // Calculate particle size based on screen size
+    const particleSize = Math.max(2, Math.min(this.gameWidth, this.gameHeight) * 0.01);
+    
     // Create simple particle effect for data collection
-    for (let i = 0; i < 30; i++) {
-      const particle = this.add.circle(x, y, 20, 0x38bdf8);
+    for (let i = 0; i < 15; i++) {
+      const particle = this.add.circle(x, y, particleSize, 0x38bdf8);
       particle.setAlpha(0.7);
       particle.setDepth(40);
       
@@ -754,9 +829,10 @@ export class MainScene extends Phaser.Scene {
     }
     
     // Add floating score text
+    const fontSize = Math.max(20, Math.min(this.gameWidth, this.gameHeight) * 0.04);
     const scorePopup = this.add.text(x, y - 20, '+10', {
       fontFamily: 'Orbitron, sans-serif',
-      fontSize: '40px',
+      fontSize: `${fontSize}px`,
       color: '#38bdf8'
     }).setOrigin(0.5);
     scorePopup.setDepth(45);
@@ -806,87 +882,33 @@ export class MainScene extends Phaser.Scene {
     // Create crash effect
     this.createCrashEffect(obj.sprite.x, obj.sprite.y);
     
-    // Show game over text
-    const gameOverText = this.add.text(
-      this.gameWidth / 2, 
-      this.gameHeight / 2 - 50, 
-      'GAME OVER', 
-      {
-        fontSize: '48px',
-        fontFamily: 'Orbitron, sans-serif',
-        color: '#ef4444',
-        stroke: '#000000',
-        strokeThickness: 6
-      }
-    ).setScrollFactor(0).setOrigin(0.5).setDepth(100);
+    // Emit game over event
+    this.game.events.emit('gameOver', this.score);
     
-    const finalScoreText = this.add.text(
-      this.gameWidth / 2, 
-      this.gameHeight / 2 + 20, 
-      `SCORE: ${this.score}`, 
-      {
-        fontSize: '32px',
-        fontFamily: 'Orbitron, sans-serif',
-        color: '#e0e7ff'
-      }
-    ).setScrollFactor(0).setOrigin(0.5).setDepth(100);
-    
-    // Add glitch effect to game over text
-    this.tweens.add({
-      targets: gameOverText,
-      x: { from: gameOverText.x - 4, to: gameOverText.x + 4 },
-      duration: 50,
-      yoyo: true,
-      repeat: -1
-    });
-    
-    // Create "Play Again" button
-    const playAgainButton = this.add.rectangle(
-      this.gameWidth / 2,
-      this.gameHeight / 2 + 80,
-      200,
-      50,
-      0x4f46e5
-    ).setInteractive();
-    
-    const playAgainText = this.add.text(
-      this.gameWidth / 2,
-      this.gameHeight / 2 + 80,
-      'PLAY AGAIN',
-      {
-        fontSize: '24px',
-        fontFamily: 'Orbitron, sans-serif',
-        color: '#FFFFFF'
-      }
-    ).setScrollFactor(0).setOrigin(0.5).setDepth(100);
-    
-    // Add button interaction
-    playAgainButton.on('pointerdown', () => {
-      this.scene.restart();
-    });
-    
-    // Add button hover effects
-    playAgainButton.on('pointerover', () => {
-      playAgainButton.setScale(1.05);
-      playAgainText.setScale(1.05);
-    });
-    
-    playAgainButton.on('pointerout', () => {
-      playAgainButton.setScale(1);
-      playAgainText.setScale(1);
+    // Delay before switching to game over scene
+    this.time.delayedCall(2000, () => {
+      // Stop all tweens
+      this.tweens.killAll();
+      
+      // Switch to game over scene with score
+      this.scene.start('GameOverScene', { score: this.score });
     });
   }
   
   createCrashEffect(x, y) {
+    // Calculate particle size based on screen dimensions
+    const particleSize = Math.max(3, Math.min(this.gameWidth, this.gameHeight) * 0.015);
+    const explosionSize = Math.min(this.gameWidth, this.gameHeight) * 0.15;
+    
     // Create explosion particles
-    for (let i = 0; i < 50; i++) {
-      const particle = this.add.circle(x, y, Math.floor(Math.random() * 20) + 12, 0xef4444);
+    for (let i = 0; i < 30; i++) {
+      const particle = this.add.circle(x, y, Math.floor(Math.random() * particleSize) + particleSize, 0xef4444);
       particle.setDepth(60);
       
       this.tweens.add({
         targets: particle,
-        x: x + Math.floor(Math.random() * 400) - 200,
-        y: y + Math.floor(Math.random() * 400) - 200,
+        x: x + Math.floor(Math.random() * 300) - 150,
+        y: y + Math.floor(Math.random() * 300) - 150,
         alpha: 0,
         scale: { from: 1, to: 0 },
         duration: Math.floor(Math.random() * 500) + 500,
@@ -897,18 +919,21 @@ export class MainScene extends Phaser.Scene {
     }
     
     // Add explosion effect
-    const explosion = this.add.circle(x, y, 160, 0xef4444, 0.7);
+    const explosion = this.add.circle(x, y, explosionSize, 0xef4444, 0.7);
     explosion.setDepth(55);
     
     this.tweens.add({
       targets: explosion,
-      scale: 3,
+      scale: 2,
       alpha: 0,
       duration: 500,
       onComplete: () => {
         explosion.destroy();
       }
     });
+    
+    // Add screen shake effect
+    this.cameras.main.shake(300, 0.01);
   }
   
   increaseSpeed() {

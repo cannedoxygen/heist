@@ -1,3 +1,4 @@
+// src/components/Game/GameControls.jsx
 import React, { useContext, useEffect } from 'react';
 import { GameContext } from '../../context/GameContext';
 import Button from '../UI/Button/Button';
@@ -15,7 +16,7 @@ const GameControls = () => {
     changeVolume 
   } = useContext(GameContext);
   
-  // Handle key presses
+  // Handle key presses - IMPORTANT FIX: Moved to useEffect for proper event handling
   useEffect(() => {
     const handleKeyDown = (e) => {
       // Jump with space bar (handled in game engine)
@@ -35,12 +36,14 @@ const GameControls = () => {
       }
     };
     
+    // Add the event listener on component mount
     window.addEventListener('keydown', handleKeyDown);
     
+    // IMPORTANT: Clean up the event listener when component unmounts
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [toggleMute, changeDifficulty]);
+  }, [toggleMute, changeDifficulty]); // Only re-add listeners if these callbacks change
   
   return (
     <div className="game-controls">

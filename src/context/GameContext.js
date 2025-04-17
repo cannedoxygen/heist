@@ -1,3 +1,4 @@
+// src/context/GameContext.js
 import React, { createContext, useState, useContext, useCallback } from 'react';
 import { WalletContext } from './WalletContext';
 
@@ -41,20 +42,23 @@ export const GameContextProvider = ({ children }) => {
     if (isConnected && isCorrectNetwork) {
       setIsPlaying(true);
       setGameOver(false);
-      setScore(0);
+      setScore(0); // Reset score when starting game
       setPlayerRank(null);
       setIsHighScore(false);
     }
   }, [isConnected, isCorrectNetwork]);
   
   // End game
-  const endGame = useCallback(async () => {
+  const endGame = useCallback(async (finalScore) => {
     setIsPlaying(false);
     setGameOver(true);
     
-    if (walletAddress && score > 0) {
+    // If we have a final score, use it, otherwise use current context score
+    const scoreToSubmit = finalScore !== undefined ? finalScore : score;
+    
+    if (walletAddress && scoreToSubmit > 0) {
       try {
-        const result = await updateLeaderboardScore(walletAddress, score);
+        const result = await updateLeaderboardScore(walletAddress, scoreToSubmit);
         setPlayerRank(result.rank);
         setIsHighScore(result.isHighScore);
       } catch (error) {
@@ -63,8 +67,10 @@ export const GameContextProvider = ({ children }) => {
     }
   }, [walletAddress, score]);
   
-  // Update score
+  // Update score - FIXED to prevent counting twice
   const updateScore = useCallback((points) => {
+    console.log("Updating score by", points, "points");
+    // Simple increment by the exact points received, no magic multiplier
     setScore(prevScore => prevScore + points);
   }, []);
   
