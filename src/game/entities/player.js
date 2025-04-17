@@ -1,4 +1,4 @@
-// src/game/entities/player.js - Self-contained with input handling
+// src/game/entities/player.js
 import Phaser from 'phaser';
 
 export class Player {
@@ -33,51 +33,33 @@ export class Player {
     this.jumpDuration = 500; // ms
     this.startY = y; // Store initial Y position for safe landing
     
-    // Create trail effect
-    this.createTrailEffect();
+    // Create trail effect (optional)
+    this.hasTrailEffect = config.hasTrailEffect !== false;
+    if (this.hasTrailEffect) {
+      this.createTrailEffect();
+    }
     
-    // Add glow effect
-    this.addGlowEffect();
+    // Add glow effect (optional)
+    this.hasGlowEffect = config.hasGlowEffect !== false;
+    if (this.hasGlowEffect) {
+      this.addGlowEffect();
+    }
     
     // Start running animation cycle
     this.startRunningAnimation();
-    
-    // IMPORTANT: Setup our own input handlers directly in the Player class
-    this.setupInputHandlers();
-    
-    // Setup update callback
-    this.scene.events.on('update', (time, delta) => {
-      this.update(time, delta);
-    });
-  }
-  
-  // Set up input handlers directly in the Player class
-  setupInputHandlers() {
-    // Jump on spacebar - direct input handling
-    this.scene.input.keyboard.on('keydown-SPACE', this.handleJumpInput, this);
-    
-    // Also handle touch/click for mobile
-    this.scene.input.on('pointerdown', this.handleJumpInput, this);
-    
-    console.log("Player input handlers initialized");
-  }
-  
-  // Jump input handler
-  handleJumpInput(event) {
-    // Only respond to direct jump input if the game is active
-    if (this.scene.game.isRunning) {
-      console.log("Jump input received");
-      this.jump();
-    }
   }
   
   calculateSizes() {
-    // Base size calculations using screen dimensions with 30% increase
-    const baseSize = Math.min(this.gameHeight * 0.195, this.gameWidth * 0.156); // 30% bigger
+    // Base size calculations using screen dimensions
+    const baseSize = Math.min(this.gameHeight * 0.5, this.gameWidth * 0.4);
     
-    // Player dimensions
+    // Player dimensions for running sprites
     this.width = baseSize;
     this.height = baseSize;
+    
+    // Separate dimensions for jump sprite (can be different)
+    this.jumpWidth = baseSize * .65; // Make jump sprite 20% larger
+    this.jumpHeight = baseSize * .65;
     
     // Effect sizes
     this.glowWidth = baseSize * 1.5;
@@ -102,10 +84,10 @@ export class Player {
       this.spriteLeft = this.scene.add.sprite(0, 0, 'playerL');
       this.spriteJump = this.scene.add.sprite(0, 0, 'playerJ');
       
-      // Set size for all sprites
+      // Set different sizes for running sprites vs jump sprite
       this.spriteRight.setDisplaySize(this.width, this.height);
       this.spriteLeft.setDisplaySize(this.width, this.height);
-      this.spriteJump.setDisplaySize(this.width, this.height);
+      this.spriteJump.setDisplaySize(this.jumpWidth, this.jumpHeight);
       
       // Add all sprites to container
       this.container.add([this.spriteRight, this.spriteLeft, this.spriteJump]);
@@ -119,13 +101,33 @@ export class Player {
       // Create different colored/shaped rectangles for each state
       this.spriteRight = this.scene.add.rectangle(0, 0, this.width, this.height, 0x4f46e5);
       this.spriteLeft = this.scene.add.rectangle(0, 0, this.width, this.height, 0x3730a3);
-      this.spriteJump = this.scene.add.rectangle(0, 0, this.width, this.height, 0x818cf8);
+      this.spriteJump = this.scene.add.rectangle(0, 0, this.jumpWidth, this.jumpHeight, 0x818cf8);
       
       // Add to container
       this.container.add([this.spriteRight, this.spriteLeft, this.spriteJump]);
       
       // Set initial visibility
       this.updateSpriteVisibility();
+    }
+  }
+  
+  // Define the updateSpriteVisibility method
+  updateSpriteVisibility() {
+    // Check if sprites exist
+    if (!this.spriteRight || !this.spriteLeft || !this.spriteJump) return;
+    
+    // Hide all sprites first
+    this.spriteRight.setVisible(false);
+    this.spriteLeft.setVisible(false);
+    this.spriteJump.setVisible(false);
+    
+    // Show the active sprite based on state
+    if (this.isJumping) {
+      this.spriteJump.setVisible(true);
+    } else if (this.direction === 'right') {
+      this.spriteRight.setVisible(true);
+    } else {
+      this.spriteLeft.setVisible(true);
     }
   }
   
@@ -157,34 +159,9 @@ export class Player {
     this.updateSpriteVisibility();
   }
   
-  // Update which sprite is visible based on current state
-  updateSpriteVisibility() {
-    // Check if sprites exist
-    if (!this.spriteRight || !this.spriteLeft || !this.spriteJump) return;
-    
-    // Hide all sprites first
-    this.spriteRight.setVisible(false);
-    this.spriteLeft.setVisible(false);
-    this.spriteJump.setVisible(false);
-    
-    // Show the active sprite based on state
-    if (this.isJumping) {
-      // During jump, show jump sprite if available, or continue alternating
-      if (this.direction === 'right') {
-        this.spriteRight.setVisible(true);
-      } else {
-        this.spriteLeft.setVisible(true);
-      }
-    } else if (this.direction === 'right') {
-      this.spriteRight.setVisible(true);
-    } else {
-      this.spriteLeft.setVisible(true);
-    }
-  }
-  
   createTrailEffect() {
     // Create simple trail effect
-    this.scene.time.addEvent({
+    this.trailEvent = this.scene.time.addEvent({
       delay: 100,
       callback: this.createTrailParticle,
       callbackScope: this,
@@ -244,10 +221,12 @@ export class Player {
         repeat: -1
       });
       
-      // Update glow position
-      this.scene.events.on('update', () => {
-        this.glow.x = this.container.x;
-        this.glow.y = this.container.y + 15;
+      // Update glow position with container
+      this.glowUpdateEvent = this.scene.events.on('update', () => {
+        if (this.glow && this.container) {
+          this.glow.x = this.container.x;
+          this.glow.y = this.container.y + 15;
+        }
       });
     } catch (e) {
       console.error('Error creating glow effect:', e);
@@ -257,11 +236,8 @@ export class Player {
   jump() {
     // Don't jump if already jumping
     if (this.isJumping) {
-      console.log("Already jumping, ignoring jump request");
       return;
     }
-    
-    console.log("Jump initiated from Y:", this.container.y);
     
     // Set jumping flag
     this.isJumping = true;
@@ -300,12 +276,10 @@ export class Player {
         // Create a second tween for the descent
         this.scene.tweens.add({
           targets: this.container,
-          y: startY,
+          y: this.startY,
           duration: this.jumpDuration / 2,
           ease: 'Sine.easeIn',
           onComplete: () => {
-            console.log("Jump complete, returned to Y:", this.container.y);
-            
             // Reset jump state after landing
             this.isJumping = false;
             this.jumpTween = null;
@@ -318,7 +292,7 @@ export class Player {
     });
     
     // Move glow with jump - separate up and down tweens
-    if (this.glow) {
+    if (this.hasGlowEffect && this.glow) {
       this.scene.tweens.add({
         targets: this.glow,
         y: this.glow.y - jumpHeight,
@@ -361,23 +335,23 @@ export class Player {
     });
   }
   
-  moveTo(laneIndex, laneX) {
+  moveTo(laneIndex, targetX) {
     // Update current lane
     this.lane = laneIndex;
     
     // Create tween to move player
     this.scene.tweens.add({
       targets: this.container,
-      x: laneX,
+      x: targetX,
       duration: 200,
       ease: 'Sine.easeInOut'
     });
     
     // Move glow with player
-    if (this.glow) {
+    if (this.hasGlowEffect && this.glow) {
       this.scene.tweens.add({
         targets: this.glow,
-        x: laneX,
+        x: targetX,
         duration: 200,
         ease: 'Sine.easeInOut'
       });
@@ -398,11 +372,9 @@ export class Player {
     this.updateSpriteVisibility();
     
     // Also reset glow position
-    if (this.glow) {
+    if (this.hasGlowEffect && this.glow) {
       this.glow.y = this.startY + 15;
     }
-    
-    console.log("Player position reset to ground level");
   }
   
   // Get player position
@@ -429,32 +401,8 @@ export class Player {
     return Phaser.Geom.Rectangle.Overlaps(playerBounds, obj.getBounds());
   }
   
-  update(time, delta) {
-    // Safety check - if player has been in a jump state too long, reset
-    if (this.isJumping && time - this.animationTimer > 2000) {
-      console.log("Jump timed out, resetting position");
-      this.resetPosition();
-    }
-    
-    // Continue to alternate running sprites even during jump
-    if (this.isJumping && !this.jumpTween) {
-      console.log("Jump state with no active tween, resetting");
-      this.isJumping = false; // fix stuck jump state
-      this.updateSpriteVisibility();
-    }
-  }
-  
   destroy() {
-    // Remove input handlers
-    this.scene.input.keyboard.off('keydown-SPACE', this.handleJumpInput, this);
-    this.scene.input.off('pointerdown', this.handleJumpInput, this);
-    
-    // Clean up all elements
-    if (this.glow) {
-      this.glow.destroy();
-    }
-    
-    // Kill active tweens
+    // Kill any active tweens
     if (this.jumpTween) {
       this.jumpTween.stop();
     }
@@ -464,13 +412,25 @@ export class Player {
       this.animationEvent.remove();
     }
     
+    // Stop trail effect
+    if (this.trailEvent) {
+      this.trailEvent.remove();
+    }
+    
+    // Remove update callback for glow
+    if (this.glowUpdateEvent) {
+      this.scene.events.off('update', this.glowUpdateEvent);
+    }
+    
+    // Clean up all elements
+    if (this.glow) {
+      this.glow.destroy();
+    }
+    
     // Destroy all sprites
     if (this.spriteRight) this.spriteRight.destroy();
     if (this.spriteLeft) this.spriteLeft.destroy();
     if (this.spriteJump) this.spriteJump.destroy();
-    
-    // Remove update callback
-    this.scene.events.off('update', this.update, this);
     
     // Destroy container
     this.container.destroy();

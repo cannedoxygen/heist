@@ -1,79 +1,77 @@
-import Phaser from 'phaser';
+// Enhance src/game/entities/obstacle.js
 
 export class Obstacle {
-  constructor(scene, x, y, z, lane) {
-    this.scene = scene;
-    this.z = z || 1000; // Z-distance (depth)
-    this.lane = lane || 0.5; // Lane position (0-1)
+    // ... existing constructor and methods ...
     
-    // Base properties - 4x larger than original
-    this.baseWidth = 100;
-    this.baseHeight = 100;
-    this.jitterRange = 20; // For glitch effect
-    
-    // Create sprite
-    if (scene.textures.exists('obstacle')) {
-      this.sprite = scene.add.sprite(x, y, 'obstacle');
-      this.sprite.setTint(0xef4444); // Red tint
-    } else {
-      // Fallback to rectangle
-      this.sprite = scene.add.rectangle(x, y, 40, 20, 0xef4444);
+    // Add method to handle collision
+    hit(scene) {
+      // Prevent multiple hits
+      if (this.hit) return false;
+      
+      // Mark as hit
+      this.hit = true;
+      
+      // Create hit effect
+      this.createHitEffect(scene);
+      
+      // Play sound
+      if (scene.sound && scene.sound.get('hit')) {
+        scene.sound.play('hit', { volume: 0.7 });
+      }
+      
+      return true;
     }
     
-    // Set depth to ensure proper rendering order
-    this.sprite.setDepth(30);
-    
-    // Add to scene's object pool
-    if (scene.objectsPool) {
-      scene.objectsPool.push({
-        type: 'obstacle',
-        sprite: this.sprite,
-        lane: this.lane,
-        z: this.z,
-        baseWidth: this.baseWidth,
-        baseHeight: this.baseHeight,
-        hit: false
-      });
-    }
-    
-    // Add effects
-    this.addGlitchEffect();
-  }
-  
-  addGlitchEffect() {
-    // Random glitch effect
-    this.scene.time.addEvent({
-      delay: Math.floor(Math.random() * 2000) + 1000, // Random delay between 1-3 seconds
-      callback: () => {
-        if (Math.random() > 0.7) {
-          // Flash the obstacle
-          this.sprite.setAlpha(0.5);
-          this.scene.time.delayedCall(100, () => {
-            this.sprite.setAlpha(1);
-          });
-          
-          // Random position jitter
-          const origX = this.sprite.x;
-          const origY = this.sprite.y;
-          this.sprite.x += Math.floor(Math.random() * this.jitterRange * 2) - this.jitterRange;
-          this.sprite.y += Math.floor(Math.random() * this.jitterRange * 2) - this.jitterRange;
-          this.scene.time.delayedCall(100, () => {
-            this.sprite.x = origX;
-            this.sprite.y = origY;
-          });
+    createHitEffect(scene) {
+      if (!this.sprite) return;
+      
+      const x = this.sprite.x;
+      const y = this.sprite.y;
+      
+      // Calculate effect sizes based on screen
+      const sceneWidth = scene.cameras.main.width;
+      const sceneHeight = scene.cameras.main.height;
+      const particleSize = Math.max(3, Math.min(sceneWidth, sceneHeight) * 0.015);
+      const explosionSize = Math.min(sceneWidth, sceneHeight) * 0.15;
+      
+      // Create explosion particles
+      for (let i = 0; i < 30; i++) {
+        const particle = scene.add.circle(
+          x, 
+          y, 
+          Phaser.Math.Between(particleSize, particleSize * 2), 
+          0xef4444
+        );
+        particle.setDepth(60);
+        
+        scene.tweens.add({
+          targets: particle,
+          x: x + Phaser.Math.Between(-150, 150),
+          y: y + Phaser.Math.Between(-150, 150),
+          alpha: 0,
+          scale: { from: 1, to: 0 },
+          duration: Phaser.Math.Between(500, 1000),
+          onComplete: () => {
+            particle.destroy();
+          }
+        });
+      }
+      
+      // Add explosion
+      const explosion = scene.add.circle(x, y, explosionSize, 0xef4444, 0.7);
+      explosion.setDepth(55);
+      
+      scene.tweens.add({
+        targets: explosion,
+        scale: 2,
+        alpha: 0,
+        duration: 500,
+        onComplete: () => {
+          explosion.destroy();
         }
-      },
-      callbackScope: this,
-      loop: true
-    });
+      });
+      
+      // Add screen shake
+      scene.cameras.main.shake(300, 0.01);
+    }
   }
-  
-  update() {
-    // This method is not used in the 3D perspective system
-    // Updates are handled by the main scene
-  }
-  
-  destroy() {
-    this.sprite.destroy();
-  }
-}

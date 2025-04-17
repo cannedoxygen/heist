@@ -1,7 +1,7 @@
 // src/game/engine.js
 import Phaser from 'phaser';
 import { MainScene } from './scenes/mainScene';
-import { GameOverScene } from './scenes/gameOverScene';
+// Remove the GameOverScene import
 
 export class GameEngine {
   constructor(containerId, scoreCallback, gameOverCallback) {
@@ -85,7 +85,7 @@ export class GameEngine {
       
       // Add scenes
       this.game.scene.add('MainScene', MainScene);
-      this.game.scene.add('GameOverScene', GameOverScene);
+      // Remove GameOverScene
       
       // Setup event listeners
       this.setupEventListeners();
@@ -101,6 +101,8 @@ export class GameEngine {
       throw error;
     }
   }
+  
+  // Rest of the file remains unchanged...
   
   setupEventListeners() {
     // Add window resize listener

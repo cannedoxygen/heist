@@ -1,4 +1,4 @@
-// src/services/gameService.js
+// src/services/gameService.js - Fixed version
 import { GameEngine } from '../game/engine';
 
 // Game service singleton
@@ -28,6 +28,7 @@ export const gameService = {
       );
       
       gameInstance.init();
+      console.log("Game engine initialized successfully");
       
       return gameInstance;
     } catch (error) {
@@ -43,10 +44,26 @@ export const gameService = {
   
   // Start game with difficulty
   startGame: (difficulty = 'normal') => {
-    if (gameInstance) {
-      gameInstance.start(difficulty);
-    } else {
+    if (!gameInstance) {
       console.error("startGame called but no game instance exists");
+      return;
+    }
+    
+    try {
+      console.log("gameService.startGame called with difficulty:", difficulty);
+      
+      // First, trigger the startGame event on the game instance
+      // This will notify the MainScene to actually start the game
+      if (gameInstance.game && gameInstance.game.events) {
+        console.log("Emitting startGame event to game instance");
+        gameInstance.game.events.emit('startGame');
+      }
+      
+      // Then call the engine's start method
+      gameInstance.start(difficulty);
+      console.log("gameService.startGame completed");
+    } catch (error) {
+      console.error("Error in gameService.startGame:", error);
     }
   },
   
@@ -71,7 +88,7 @@ export const gameService = {
     }
   },
   
-  // ADDED: Resize method - this was missing
+  // Resize method
   resize: () => {
     if (gameInstance) {
       // Check if game instance has a resize method

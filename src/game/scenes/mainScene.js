@@ -1,4 +1,4 @@
-// src/game/scenes/mainScene.js - With player input handling removed
+// src/game/scenes/mainScene.js
 import Phaser from 'phaser';
 import { TronGrid } from '../TronGrid';
 import { Player } from '../entities/player';
@@ -64,6 +64,11 @@ export class MainScene extends Phaser.Scene {
     this.gameSpeed = this.difficulties[this.difficulty].speed;
     this.obstacleInterval = this.difficulties[this.difficulty].obstacleInterval;
     this.dataInterval = this.difficulties[this.difficulty].dataInterval;
+    
+    // Reset TronGrid speed multiplier
+    if (this.tronGrid) {
+      this.tronGrid.setSpeedMultiplier(1.0);
+    }
     
     // Current lane (start in center)
     this.currentLane = 1;
@@ -155,6 +160,10 @@ export class MainScene extends Phaser.Scene {
     // Setup lanes
     this.setupLaneMovement();
     
+    // Setup jump input handlers
+    this.input.keyboard.on('keydown-SPACE', this.handleJumpInput, this);
+    this.input.on('pointerdown', this.handleJumpInput, this);
+    
     // Reset game state
     this.isGameOver = false;
     this.spawnTimer = this.obstacleInterval;
@@ -164,7 +173,13 @@ export class MainScene extends Phaser.Scene {
     // This prevents objects from appearing during the start overlay
   }
   
-  // Method to start the game - called when the start button is clicked
+  handleJumpInput() {
+    // Only handle jump if game is running and not in game over state
+    if (this.game.isRunning && !this.isGameOver && this.player) {
+      this.player.jump();
+    }
+  }
+  
   startGame() {
     // Add initial objects only when game starts
     this.populateInitialObjects();
@@ -199,18 +214,29 @@ export class MainScene extends Phaser.Scene {
   createPlayer() {
     // Player position
     const playerX = this.gameWidth / 2;
-    const playerY = this.gameHeight - 80;
+    // Position player higher up (changed from -80 to -120)
+    const playerY = this.gameHeight - 120;
     
-    // Create player using our enhanced Player class
-    this.player = new Player(this, playerX, playerY);
-    
-    // Set player to center lane
-    this.movePlayerToLane(1);
+    try {
+      // Create player using our enhanced Player class
+      this.player = new Player(this, playerX, playerY, {
+        hasGlowEffect: false // Disable the glow effect
+      });
+      
+      // Add a small delay to ensure player is properly initialized
+      this.time.delayedCall(50, () => {
+        // Set player to center lane
+        if (this.player && this.player.container) {
+          this.movePlayerToLane(1);
+        }
+      });
+    } catch (error) {
+      console.error('Error creating player:', error);
+    }
   }
   
   setupLaneMovement() {
     // Setup lane movement controls (left/right only)
-    // Jump is handled internally by the Player class
     this.input.keyboard.on('keydown-LEFT', this.moveLeft, this);
     this.input.keyboard.on('keydown-RIGHT', this.moveRight, this);
     
@@ -270,10 +296,12 @@ export class MainScene extends Phaser.Scene {
     
     // Update player position if it exists
     if (this.player) {
-      // Update player's ground position
-      const playerY = height - 80;
+      // Update player's ground position - adjusted higher
+      const playerY = height - 120; // Changed from 80 to 120
       this.player.startY = playerY;
-      this.player.container.y = playerY;
+      if (this.player.container) {
+        this.player.container.y = playerY;
+      }
       
       // Update player glow
       if (this.player.glow) {
@@ -282,6 +310,47 @@ export class MainScene extends Phaser.Scene {
       
       // Ensure player is in correct lane
       this.movePlayerToLane(this.currentLane);
+    }
+  }
+  
+  movePlayerToLane(laneIndex) {
+    // Add more defensive checks
+    if (!this.player) return;
+    if (!this.player.container) return;
+    if (!this.tronGrid) return;
+    
+    // Validate lane index
+    if (laneIndex < 0 || laneIndex >= this.lanes.length) {
+      return;
+    }
+    
+    // Update current lane
+    this.currentLane = laneIndex;
+    
+    // Use fixed Y position if container isn't fully initialized yet
+    const playerY = this.player.container.y || (this.gameHeight - 120);
+    
+    // Calculate lane position with perspective
+    const perspectiveRatio = (playerY - this.tronGrid.config.horizonY) / 
+                            (this.gameHeight - this.tronGrid.config.horizonY);
+    const roadWidth = this.tronGrid.config.gridWidthAtHorizon + 
+                     (this.tronGrid.config.gridWidth - this.tronGrid.config.gridWidthAtHorizon) * 
+                     perspectiveRatio;
+    const roadLeft = (this.gameWidth - roadWidth) / 2;
+    const lanePosition = this.lanes[laneIndex];
+    const targetX = roadLeft + roadWidth * lanePosition;
+    
+    // Move the player (using the Player's moveTo method if it exists)
+    if (this.player.moveTo && typeof this.player.moveTo === 'function') {
+      this.player.moveTo(laneIndex, targetX);
+    } else {
+      // Fallback if moveTo doesn't exist
+      this.tweens.add({
+        targets: this.player.container,
+        x: targetX,
+        duration: 200,
+        ease: 'Sine.easeInOut'
+      });
     }
   }
   
@@ -410,29 +479,6 @@ export class MainScene extends Phaser.Scene {
       this.currentLane++;
       this.movePlayerToLane(this.currentLane);
     }
-  }
-  
-  movePlayerToLane(laneIndex) {
-    if (!this.player || !this.tronGrid) return;
-    
-    // Validate lane index
-    if (laneIndex < 0 || laneIndex >= this.lanes.length) {
-      return;
-    }
-    
-    // Calculate lane position with perspective
-    const playerY = this.player.container.y;
-    const perspectiveRatio = (playerY - this.tronGrid.config.horizonY) / 
-                            (this.gameHeight - this.tronGrid.config.horizonY);
-    const roadWidth = this.tronGrid.config.gridWidthAtHorizon + 
-                     (this.tronGrid.config.gridWidth - this.tronGrid.config.gridWidthAtHorizon) * 
-                     perspectiveRatio;
-    const roadLeft = (this.gameWidth - roadWidth) / 2;
-    const lanePosition = this.lanes[laneIndex];
-    const targetX = roadLeft + roadWidth * lanePosition;
-    
-    // Use the Player class moveTo method
-    this.player.moveTo(laneIndex, targetX);
   }
   
   spawnObstacle() {
@@ -691,7 +737,7 @@ export class MainScene extends Phaser.Scene {
     // Animate popup
     this.tweens.add({
       targets: scorePopup,
-      y: y - 120,
+      y: y - 600,
       alpha: 0,
       duration: 800,
       onComplete: () => {
@@ -741,7 +787,8 @@ export class MainScene extends Phaser.Scene {
       console.error('Error emitting game over event:', error);
     }
     
-    // Switch to game over scene after delay
+    // Don't transition to GameOverScene - let React handle this
+    // Just pause the game after a short delay
     this.time.delayedCall(2000, () => {
       try {
         this.tweens.killAll();
@@ -749,11 +796,10 @@ export class MainScene extends Phaser.Scene {
         // Mark game as not running (for Player input handling)
         this.game.isRunning = false;
         
-        this.scene.start('GameOverScene', { score: this.score });
+        // Pause the scene
+        this.scene.pause();
       } catch (error) {
-        console.error('Error transitioning to GameOverScene:', error);
-        // Forcibly restart the game if transition fails
-        this.scene.start('MainScene');
+        console.error('Error pausing scene:', error);
       }
     });
   }
@@ -808,11 +854,27 @@ export class MainScene extends Phaser.Scene {
     // Only increase up to a maximum
     if (this.gameSpeed < 5) {
       this.gameSpeed += 0.2;
+      
+      // Update the grid's speed multiplier when game speed changes
+      if (this.tronGrid) {
+        // Calculate a multiplier based on the starting and current speeds
+        const startingSpeed = this.difficulties[this.difficulty].speed;
+        const multiplier = this.gameSpeed / startingSpeed;
+        this.tronGrid.setSpeedMultiplier(multiplier);
+      }
     }
   }
   
   // Cleanup when scene shuts down
   shutdown() {
+    // Remove input handlers
+    this.input.keyboard.off('keydown-LEFT', this.moveLeft, this);
+    this.input.keyboard.off('keydown-RIGHT', this.moveRight, this);
+    this.input.keyboard.off('keydown-SPACE', this.handleJumpInput, this);
+    this.input.off('pointerdown', this.startSwipe, this);
+    this.input.off('pointerup', this.endSwipe, this);
+    this.input.off('pointerdown', this.handleJumpInput, this);
+    
     // Mark game as not running (for Player input handling)
     if (this.game) {
       this.game.isRunning = false;
