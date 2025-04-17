@@ -39,9 +39,13 @@ export class MainScene extends Phaser.Scene {
     this.objectsPool = [];
     this.objectsToRemove = [];
     
-    // Game lanes configuration (normalized 0-1)
-    this.lanes = [0.25, 0.5, 0.75];
+    // Game lanes configuration (normalized 0-1) - wider spread
+    this.lanes = [0.2, 0.5, 0.8];
     this.currentLane = 1; // Start in center lane
+    
+    // Sound management
+    this.audioInitialized = false;
+    this.soundsLoaded = false;
   }
   
   init(data) {
@@ -78,6 +82,9 @@ export class MainScene extends Phaser.Scene {
     // Create loading visuals
     this.createLoadingUI();
     
+    // Configure audio
+    this.configureAudio();
+    
     // Load game assets
     this.loadGameAssets();
   }
@@ -105,12 +112,25 @@ export class MainScene extends Phaser.Scene {
       progressBar.clear();
       progressBar.fillStyle(0xffffff, 1);
       progressBar.fillRect(width * 0.26, height * 0.46, width * 0.48 * value, height * 0.08);
+      console.log(`Loading progress: ${Math.round(value * 100)}%`);
     });
     
     this.load.on('complete', () => {
       progressBar.destroy();
       progressBox.destroy();
       loadingText.destroy();
+      console.log('All assets loaded!');
+    });
+  }
+  
+  configureAudio() {
+    // Configure Phaser sound system
+    this.sound.setVolume(0.8); // Set global volume
+    
+    // Setup audio events
+    this.sound.once('unlocked', () => {
+      console.log('🔊 Phaser Sound System Unlocked');
+      this.audioInitialized = true;
     });
   }
   
@@ -131,22 +151,42 @@ export class MainScene extends Phaser.Scene {
       console.warn('Error loading sprite assets:', e);
     }
     
-    // Load audio
+    // Load audio - VERY IMPORTANT: Use absolute paths
     this.load.setPath('/assets/audio/');
     
     try {
-      this.load.audio('jump', 'jump.mp3');
-      this.load.audio('collect', 'collect.mp3');
-      this.load.audio('hit', 'hit.mp3');
-      this.load.audio('gameover', 'gameover.mp3');
+      // Load audio files - be explicit about format
+      this.load.audio('jump', ['jump.mp3']);
+      this.load.audio('collect', ['collect.mp3']);
+      this.load.audio('hit', ['hit.mp3']);
+      this.load.audio('gameover', ['gameover.mp3']);
+      
+      // Track audio loading
+      this.load.on('filecomplete', (key, type, data) => {
+        if (type === 'audio') {
+          console.log(`🎵 Audio file loaded successfully: ${key}`);
+        }
+      });
+      
+      // Track audio loading errors
+      this.load.on('loaderror', (file) => {
+        console.error(`❌ Error loading file: ${file.key} (${file.url})`);
+        
+        if (file.type === 'audio') {
+          console.error(`Audio file ${file.key} failed to load from ${file.url}`);
+        }
+      });
     } catch (e) {
-      console.warn('Error loading audio assets:', e);
+      console.error('Error setting up audio assets:', e);
     }
   }
   
   create() {
     // Set game as running (for input handling in Player class)
     this.game.isRunning = true;
+    
+    // Debug current sound system
+    this.debugSoundSystem();
     
     // Set background color
     this.cameras.main.setBackgroundColor(0x0a0e17);
@@ -173,6 +213,26 @@ export class MainScene extends Phaser.Scene {
     // This prevents objects from appearing during the start overlay
   }
   
+  debugSoundSystem() {
+    // Log sound system status to debug issues
+    console.log('🎵 SOUND SYSTEM STATUS:');
+    console.log('- Sound enabled:', this.sound.isEnabled);
+    console.log('- Sound locked:', this.sound.locked);
+    console.log('- Global volume:', this.sound.volume);
+    console.log('- Loaded sounds:', Object.keys(this.sound.sounds || {}));
+    
+    // Try to play a test sound to check system
+    try {
+      if (this.sound.sounds.jump) {
+        console.log('- Jump sound exists and will test play when you click/tap');
+      } else {
+        console.warn('- Jump sound not loaded yet');
+      }
+    } catch (e) {
+      console.error('Error checking sound:', e);
+    }
+  }
+  
   handleJumpInput() {
     // Only handle jump if game is running and not in game over state
     if (this.game.isRunning && !this.isGameOver && this.player) {
@@ -181,11 +241,40 @@ export class MainScene extends Phaser.Scene {
   }
   
   startGame() {
+    // Ensure audio is unlocked - this method should be called from user interaction
+    this.unlockAudio();
+    
     // Add initial objects only when game starts
     this.populateInitialObjects();
     
     // Setup speed increase timer
     this.setupSpeedIncrease();
+  }
+  
+  unlockAudio() {
+    // Unlock audio context if needed
+    if (this.sound && this.sound.locked) {
+      console.log('🔊 Attempting to unlock Phaser sound system...');
+      
+      try {
+        this.sound.unlock();
+        
+        // Test play a sound with zero volume to unblock audio
+        this.time.delayedCall(100, () => {
+          // Play silent sound to initialize audio system
+          if (this.sound.sounds.jump) {
+            console.log('Playing silent test sound...');
+            this.sound.play('jump', { volume: 0 });
+          } else {
+            console.warn('Jump sound not available for test play');
+          }
+        });
+      } catch (e) {
+        console.error('Error unlocking audio:', e);
+      }
+    } else {
+      console.log('🔊 Sound system already unlocked or not available');
+    }
   }
   
   createTronGrid() {
@@ -215,7 +304,7 @@ export class MainScene extends Phaser.Scene {
     // Player position
     const playerX = this.gameWidth / 2;
     // Position player higher up (changed from -80 to -120)
-    const playerY = this.gameHeight - 120;
+    const playerY = this.gameHeight - 155;
     
     try {
       // Create player using our enhanced Player class
@@ -243,6 +332,26 @@ export class MainScene extends Phaser.Scene {
     // For mobile swipe controls (for lane changes only)
     this.input.on('pointerdown', this.startSwipe, this);
     this.input.on('pointerup', this.endSwipe, this);
+    
+    // Audio unlocker - this is crucial for audio to work
+    const unlockAudio = () => {
+      try {
+        // Unlock audio on user interaction
+        this.unlockAudio();
+        
+        // Remove these listeners after first interaction
+        this.time.delayedCall(500, () => {
+          this.input.off('pointerdown', unlockAudio);
+          this.input.keyboard.off('keydown', unlockAudio);
+        });
+      } catch (e) {
+        console.error('Error in audio unlock interaction:', e);
+      }
+    };
+    
+    // Add listeners for first interaction to unlock audio
+    this.input.on('pointerdown', unlockAudio);
+    this.input.keyboard.on('keydown', unlockAudio);
   }
   
   startSwipe(pointer) {
@@ -297,7 +406,7 @@ export class MainScene extends Phaser.Scene {
     // Update player position if it exists
     if (this.player) {
       // Update player's ground position - adjusted higher
-      const playerY = height - 120; // Changed from 80 to 120
+      const playerY = height - 155; // Changed from 80 to 120
       this.player.startY = playerY;
       if (this.player.container) {
         this.player.container.y = playerY;
@@ -524,7 +633,7 @@ export class MainScene extends Phaser.Scene {
       sprite: sprite,
       lane: laneIndex / (this.lanes.length - 1), // Normalize to 0-1
       z: z,
-      baseWidth: Math.min(this.gameHeight * 0.15, this.gameWidth * 0.2) * 1.5,
+      baseWidth: Math.min(this.gameHeight * 0.15, this.gameWidth * 0.2) ,
       baseHeight: Math.min(this.gameHeight * 0.15, this.gameWidth * 0.2),
       hit: false,
       destroyed: false
@@ -591,8 +700,8 @@ export class MainScene extends Phaser.Scene {
       sprite: sprite,
       lane: laneIndex / (this.lanes.length - 1),
       z: z,
-      baseWidth: Math.min(this.gameHeight * 0.08, this.gameWidth * 0.08),
-      baseHeight: Math.min(this.gameHeight * 0.08, this.gameWidth * 0.08),
+      baseWidth: Math.min(this.gameHeight * 0.12, this.gameWidth * 0.12),
+      baseHeight: Math.min(this.gameHeight * 0.12, this.gameWidth * 0.12),
       collected: false,
       destroyed: false
     };
@@ -658,9 +767,12 @@ export class MainScene extends Phaser.Scene {
         this.objectsToRemove.push(obj);
       }
       
-      // Play sound
-      if (this.sound && this.sound.get('collect')) {
-        this.sound.play('collect', { volume: 0.5 });
+      // Play collect sound
+      console.log('🎵 Playing collect sound');
+      if (this.sound && this.sound.sounds.collect) {
+        this.sound.play('collect', { volume: 0.7 });
+      } else {
+        console.warn('Collect sound not available');
       }
       
       // Update internal score
@@ -753,16 +865,23 @@ export class MainScene extends Phaser.Scene {
     obj.hit = true;
     this.isGameOver = true;
     
-    // Play sound effects
-    if (this.sound && this.sound.get('hit')) {
+    // Play hit sound
+    console.log('🎵 Playing hit sound');
+    if (this.sound && this.sound.sounds.hit) {
       this.sound.play('hit', { volume: 0.7 });
+    } else {
+      console.warn('Hit sound not available');
     }
     
-    if (this.sound && this.sound.get('gameover')) {
-      this.time.delayedCall(500, () => {
+    // Play game over sound after short delay
+    this.time.delayedCall(500, () => {
+      console.log('🎵 Playing gameover sound');
+      if (this.sound && this.sound.sounds.gameover) {
         this.sound.play('gameover', { volume: 0.5 });
-      });
-    }
+      } else {
+        console.warn('Gameover sound not available');
+      }
+    });
     
     // Flash player
     if (this.player) {

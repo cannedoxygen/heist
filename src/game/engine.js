@@ -1,7 +1,6 @@
 // src/game/engine.js
 import Phaser from 'phaser';
 import { MainScene } from './scenes/mainScene';
-// Remove the GameOverScene import
 
 export class GameEngine {
   constructor(containerId, scoreCallback, gameOverCallback) {
@@ -73,6 +72,11 @@ export class GameEngine {
         render: {
           pixelArt: false,
           antialias: true
+        },
+        // Add explicit audio config
+        audio: {
+          disableWebAudio: false,
+          noAudio: false
         }
       };
       
@@ -85,7 +89,6 @@ export class GameEngine {
       
       // Add scenes
       this.game.scene.add('MainScene', MainScene);
-      // Remove GameOverScene
       
       // Setup event listeners
       this.setupEventListeners();
@@ -96,13 +99,13 @@ export class GameEngine {
         gameWidth: containerWidth,
         gameHeight: containerHeight
       });
+      
+      console.log('Game engine initialized with dimensions:', containerWidth, 'x', containerHeight);
     } catch (error) {
       this.handleInitError(error);
       throw error;
     }
   }
-  
-  // Rest of the file remains unchanged...
   
   setupEventListeners() {
     // Add window resize listener
@@ -160,6 +163,8 @@ export class GameEngine {
     if (activeScene && typeof activeScene.handleResize === 'function') {
       activeScene.handleResize(width, height);
     }
+    
+    console.log('Game resized to:', width, 'x', height);
   }
   
   start(difficulty = 'normal') {
@@ -182,12 +187,15 @@ export class GameEngine {
       gameWidth: width,
       gameHeight: height
     });
+    
+    console.log('Game started with difficulty:', difficulty);
   }
   
   stop() {
     if (this.game && this.isRunning) {
       this.isRunning = false;
       this.game.scene.stop('MainScene');
+      console.log('Game stopped');
     }
   }
   
@@ -211,6 +219,8 @@ export class GameEngine {
       const validScore = finalScore !== undefined ? finalScore : this.currentScore;
       this.gameOverCallback(validScore);
     }
+    
+    console.log('Game over with score:', finalScore);
   }
   
   setVolume(volume) {
@@ -218,6 +228,7 @@ export class GameEngine {
     
     if (this.game && this.game.sound) {
       this.game.sound.volume = volume;
+      console.log('Game volume set to:', volume);
     }
   }
   
@@ -226,6 +237,7 @@ export class GameEngine {
     
     if (this.game && this.game.sound) {
       this.game.sound.mute = this.isMuted;
+      console.log('Game sound muted:', this.isMuted);
     }
   }
   
@@ -251,6 +263,7 @@ export class GameEngine {
       // Destroy the game instance
       this.game.destroy(true);
       this.game = null;
+      console.log('Game engine destroyed');
     } catch (error) {
       // Ignore errors during destroy
       this.game = null;

@@ -51,7 +51,7 @@ export class Player {
   
   calculateSizes() {
     // Base size calculations using screen dimensions
-    const baseSize = Math.min(this.gameHeight * 0.5, this.gameWidth * 0.4);
+    const baseSize = Math.min(this.gameHeight * 0.55, this.gameWidth * 0.4);
     
     // Player dimensions for running sprites
     this.width = baseSize;
@@ -254,9 +254,12 @@ export class Player {
     // Update sprite to jumping state
     this.updateSpriteVisibility();
     
-    // Play jump sound
-    if (this.scene.sound && this.scene.sound.get('jump')) {
-      this.scene.sound.play('jump', { volume: 0.5 });
+    // Play jump sound directly
+    console.log('🎵 Player playing jump sound');
+    if (this.scene.sound && this.scene.sound.sounds && this.scene.sound.sounds.jump) {
+      this.scene.sound.play('jump', { volume: 0.7 });
+    } else {
+      console.warn('Jump sound not available in scene');
     }
     
     // Create jump effect
