@@ -10,7 +10,6 @@ export class MainScene extends Phaser.Scene {
     // Game state
     this.score = 0;
     this.isGameOver = false;
-    this.isGridCreated = false;
     
     // Difficulty settings
     this.difficulties = {
@@ -39,13 +38,9 @@ export class MainScene extends Phaser.Scene {
     this.objectsPool = [];
     this.objectsToRemove = [];
     
-    // Game lanes configuration (normalized 0-1) - wider spread
+    // Game lanes configuration (normalized 0-1)
     this.lanes = [0.2, 0.5, 0.8];
     this.currentLane = 1; // Start in center lane
-    
-    // Sound management
-    this.audioInitialized = false;
-    this.soundsLoaded = false;
   }
   
   init(data) {
@@ -82,11 +77,20 @@ export class MainScene extends Phaser.Scene {
     // Create loading visuals
     this.createLoadingUI();
     
-    // Configure audio
-    this.configureAudio();
-    
     // Load game assets
-    this.loadGameAssets();
+    this.load.setPath('/assets/images/');
+    this.load.image('playerL', 'playerL.png');
+    this.load.image('playerR', 'playerR.png');
+    this.load.image('playerJ', 'playerJ.png');
+    this.load.image('obstacle', 'obstacle.png');
+    this.load.image('data', 'data.png');
+    
+    // Load audio files
+    this.load.setPath('/assets/audio/');
+    this.load.audio('jump', 'jump.mp3');
+    this.load.audio('collect', 'collect.mp3');
+    this.load.audio('hit', 'hit.mp3');
+    this.load.audio('gameover', 'gameover.mp3');
   }
   
   createLoadingUI() {
@@ -112,86 +116,30 @@ export class MainScene extends Phaser.Scene {
       progressBar.clear();
       progressBar.fillStyle(0xffffff, 1);
       progressBar.fillRect(width * 0.26, height * 0.46, width * 0.48 * value, height * 0.08);
-      console.log(`Loading progress: ${Math.round(value * 100)}%`);
     });
     
     this.load.on('complete', () => {
       progressBar.destroy();
       progressBox.destroy();
       loadingText.destroy();
-      console.log('All assets loaded!');
     });
-  }
-  
-  configureAudio() {
-    // Configure Phaser sound system
-    this.sound.setVolume(0.8); // Set global volume
-    
-    // Setup audio events
-    this.sound.once('unlocked', () => {
-      console.log('🔊 Phaser Sound System Unlocked');
-      this.audioInitialized = true;
-    });
-  }
-  
-  loadGameAssets() {
-    // Set path for images
-    this.load.setPath('/assets/images/');
-    
-    try {
-      // Load player character sprites with correct names
-      this.load.image('playerL', 'playerL.png');
-      this.load.image('playerR', 'playerR.png');
-      this.load.image('playerJ', 'playerJ.png');
-      
-      // Load other game assets
-      this.load.image('obstacle', 'obstacle.png');
-      this.load.image('data', 'data.png');
-    } catch (e) {
-      console.warn('Error loading sprite assets:', e);
-    }
-    
-    // Load audio - VERY IMPORTANT: Use absolute paths
-    this.load.setPath('/assets/audio/');
-    
-    try {
-      // Load audio files - be explicit about format
-      this.load.audio('jump', ['jump.mp3']);
-      this.load.audio('collect', ['collect.mp3']);
-      this.load.audio('hit', ['hit.mp3']);
-      this.load.audio('gameover', ['gameover.mp3']);
-      
-      // Track audio loading
-      this.load.on('filecomplete', (key, type, data) => {
-        if (type === 'audio') {
-          console.log(`🎵 Audio file loaded successfully: ${key}`);
-        }
-      });
-      
-      // Track audio loading errors
-      this.load.on('loaderror', (file) => {
-        console.error(`❌ Error loading file: ${file.key} (${file.url})`);
-        
-        if (file.type === 'audio') {
-          console.error(`Audio file ${file.key} failed to load from ${file.url}`);
-        }
-      });
-    } catch (e) {
-      console.error('Error setting up audio assets:', e);
-    }
   }
   
   create() {
-    // Set game as running (for input handling in Player class)
+    // Set game as running (for input handling)
     this.game.isRunning = true;
     
-    // Debug current sound system
-    this.debugSoundSystem();
+    // Simple audio unlock on first interaction
+    this.input.once('pointerdown', () => {
+      if (this.sound.locked) {
+        this.sound.unlock();
+      }
+    });
     
     // Set background color
     this.cameras.main.setBackgroundColor(0x0a0e17);
     
-    // Create the Tron grid first - fixes resize issue
+    // Create the Tron grid
     this.createTronGrid();
     
     // Create player
@@ -209,28 +157,8 @@ export class MainScene extends Phaser.Scene {
     this.spawnTimer = this.obstacleInterval;
     this.dataSpawnTimer = this.dataInterval;
     
-    // Wait to add initial objects until the game actually starts
-    // This prevents objects from appearing during the start overlay
-  }
-  
-  debugSoundSystem() {
-    // Log sound system status to debug issues
-    console.log('🎵 SOUND SYSTEM STATUS:');
-    console.log('- Sound enabled:', this.sound.isEnabled);
-    console.log('- Sound locked:', this.sound.locked);
-    console.log('- Global volume:', this.sound.volume);
-    console.log('- Loaded sounds:', Object.keys(this.sound.sounds || {}));
-    
-    // Try to play a test sound to check system
-    try {
-      if (this.sound.sounds.jump) {
-        console.log('- Jump sound exists and will test play when you click/tap');
-      } else {
-        console.warn('- Jump sound not loaded yet');
-      }
-    } catch (e) {
-      console.error('Error checking sound:', e);
-    }
+    // Listen for start event
+    this.game.events.on('startGame', this.startGame, this);
   }
   
   handleJumpInput() {
@@ -241,40 +169,16 @@ export class MainScene extends Phaser.Scene {
   }
   
   startGame() {
-    // Ensure audio is unlocked - this method should be called from user interaction
-    this.unlockAudio();
+    // Try to unlock audio
+    if (this.sound.locked) {
+      this.sound.unlock();
+    }
     
-    // Add initial objects only when game starts
+    // Populate initial objects
     this.populateInitialObjects();
     
     // Setup speed increase timer
     this.setupSpeedIncrease();
-  }
-  
-  unlockAudio() {
-    // Unlock audio context if needed
-    if (this.sound && this.sound.locked) {
-      console.log('🔊 Attempting to unlock Phaser sound system...');
-      
-      try {
-        this.sound.unlock();
-        
-        // Test play a sound with zero volume to unblock audio
-        this.time.delayedCall(100, () => {
-          // Play silent sound to initialize audio system
-          if (this.sound.sounds.jump) {
-            console.log('Playing silent test sound...');
-            this.sound.play('jump', { volume: 0 });
-          } else {
-            console.warn('Jump sound not available for test play');
-          }
-        });
-      } catch (e) {
-        console.error('Error unlocking audio:', e);
-      }
-    } else {
-      console.log('🔊 Sound system already unlocked or not available');
-    }
   }
   
   createTronGrid() {
@@ -296,62 +200,34 @@ export class MainScene extends Phaser.Scene {
       lineWidth: 2,
       colorCycleSpeed: 0.0005
     });
-    
-    this.isGridCreated = true;
   }
   
   createPlayer() {
     // Player position
     const playerX = this.gameWidth / 2;
-    // Position player higher up (changed from -80 to -120)
     const playerY = this.gameHeight - 155;
     
-    try {
-      // Create player using our enhanced Player class
-      this.player = new Player(this, playerX, playerY, {
-        hasGlowEffect: false // Disable the glow effect
-      });
-      
-      // Add a small delay to ensure player is properly initialized
-      this.time.delayedCall(50, () => {
-        // Set player to center lane
-        if (this.player && this.player.container) {
-          this.movePlayerToLane(1);
-        }
-      });
-    } catch (error) {
-      console.error('Error creating player:', error);
-    }
+    // Create player
+    this.player = new Player(this, playerX, playerY, {
+      hasGlowEffect: false
+    });
+    
+    // Set player to center lane
+    this.time.delayedCall(50, () => {
+      if (this.player && this.player.container) {
+        this.movePlayerToLane(1);
+      }
+    });
   }
   
   setupLaneMovement() {
-    // Setup lane movement controls (left/right only)
+    // Setup lane movement controls
     this.input.keyboard.on('keydown-LEFT', this.moveLeft, this);
     this.input.keyboard.on('keydown-RIGHT', this.moveRight, this);
     
-    // For mobile swipe controls (for lane changes only)
+    // For mobile swipe controls
     this.input.on('pointerdown', this.startSwipe, this);
     this.input.on('pointerup', this.endSwipe, this);
-    
-    // Audio unlocker - this is crucial for audio to work
-    const unlockAudio = () => {
-      try {
-        // Unlock audio on user interaction
-        this.unlockAudio();
-        
-        // Remove these listeners after first interaction
-        this.time.delayedCall(500, () => {
-          this.input.off('pointerdown', unlockAudio);
-          this.input.keyboard.off('keydown', unlockAudio);
-        });
-      } catch (e) {
-        console.error('Error in audio unlock interaction:', e);
-      }
-    };
-    
-    // Add listeners for first interaction to unlock audio
-    this.input.on('pointerdown', unlockAudio);
-    this.input.keyboard.on('keydown', unlockAudio);
   }
   
   startSwipe(pointer) {
@@ -394,7 +270,7 @@ export class MainScene extends Phaser.Scene {
     });
   }
   
-  // Handle resize - fixes grid adjustment issue
+  // Handle resize
   handleResize(width, height) {
     // Update stored dimensions
     this.gameWidth = width;
@@ -405,8 +281,8 @@ export class MainScene extends Phaser.Scene {
     
     // Update player position if it exists
     if (this.player) {
-      // Update player's ground position - adjusted higher
-      const playerY = height - 155; // Changed from 80 to 120
+      // Update player's ground position
+      const playerY = height - 155;
       this.player.startY = playerY;
       if (this.player.container) {
         this.player.container.y = playerY;
@@ -423,10 +299,7 @@ export class MainScene extends Phaser.Scene {
   }
   
   movePlayerToLane(laneIndex) {
-    // Add more defensive checks
-    if (!this.player) return;
-    if (!this.player.container) return;
-    if (!this.tronGrid) return;
+    if (!this.player || !this.player.container || !this.tronGrid) return;
     
     // Validate lane index
     if (laneIndex < 0 || laneIndex >= this.lanes.length) {
@@ -437,7 +310,7 @@ export class MainScene extends Phaser.Scene {
     this.currentLane = laneIndex;
     
     // Use fixed Y position if container isn't fully initialized yet
-    const playerY = this.player.container.y || (this.gameHeight - 120);
+    const playerY = this.player.container.y || (this.gameHeight - 155);
     
     // Calculate lane position with perspective
     const perspectiveRatio = (playerY - this.tronGrid.config.horizonY) / 
@@ -449,7 +322,7 @@ export class MainScene extends Phaser.Scene {
     const lanePosition = this.lanes[laneIndex];
     const targetX = roadLeft + roadWidth * lanePosition;
     
-    // Move the player (using the Player's moveTo method if it exists)
+    // Move the player
     if (this.player.moveTo && typeof this.player.moveTo === 'function') {
       this.player.moveTo(laneIndex, targetX);
     } else {
@@ -483,7 +356,7 @@ export class MainScene extends Phaser.Scene {
     // Clean up objects marked for removal
     this.cleanupObjects();
     
-    // IMPORTANT: Ensure lane position wasn't accidentally changed
+    // Ensure lane position wasn't accidentally changed
     if (this.currentLane !== savedLane) {
       this.currentLane = savedLane;
       this.movePlayerToLane(savedLane);
@@ -519,7 +392,7 @@ export class MainScene extends Phaser.Scene {
       // Skip invalid objects
       if (!obj || obj.destroyed) continue;
       
-      // Skip collected objects - don't mark them for removal yet, just skip processing
+      // Skip collected objects
       if (obj.type === 'collectible' && obj.collected) {
         continue;
       }
@@ -633,7 +506,7 @@ export class MainScene extends Phaser.Scene {
       sprite: sprite,
       lane: laneIndex / (this.lanes.length - 1), // Normalize to 0-1
       z: z,
-      baseWidth: Math.min(this.gameHeight * 0.15, this.gameWidth * 0.2) ,
+      baseWidth: Math.min(this.gameHeight * 0.15, this.gameWidth * 0.2),
       baseHeight: Math.min(this.gameHeight * 0.15, this.gameWidth * 0.2),
       hit: false,
       destroyed: false
@@ -755,63 +628,40 @@ export class MainScene extends Phaser.Scene {
     // Prevent double collection and validate object
     if (!obj || !obj.sprite || obj.collected || obj.destroyed) return;
     
-    // Store the current lane before any operations
-    const currentLane = this.currentLane;
+    // Mark as collected
+    obj.collected = true;
     
-    try {
-      // Mark as collected immediately to prevent duplicate processing
-      obj.collected = true;
-      
-      // Add to removal list
-      if (!this.objectsToRemove.includes(obj)) {
-        this.objectsToRemove.push(obj);
-      }
-      
-      // Play collect sound
-      console.log('🎵 Playing collect sound');
-      if (this.sound && this.sound.sounds.collect) {
-        this.sound.play('collect', { volume: 0.7 });
-      } else {
-        console.warn('Collect sound not available');
-      }
-      
-      // Update internal score
-      this.score += 10;
-      
-      // Emit event to React
-      try {
-        if (this.game && this.game.events) {
-          this.game.events.emit('updateScore', 10);
-        }
-      } catch (error) {
-        console.error('Error emitting score update event:', error);
-      }
-      
-      // Hide sprite but don't destroy immediately
-      if (obj.sprite) {
-        obj.sprite.visible = false;
-      }
-      
-      // Create effect
-      this.createCollectParticles(obj.sprite.x, obj.sprite.y);
-      
-      // Schedule sprite destruction after a short delay
-      this.time.delayedCall(50, () => {
-        try {
-          if (obj.sprite && !obj.sprite.destroyed) {
-            obj.sprite.destroy();
-            obj.sprite = null;
-          }
-        } catch (e) {
-          console.error('Error destroying sprite:', e);
-        }
-      });
-    } catch (error) {
-      console.error('Error in collectData:', error);
-    } finally {
-      // Always ensure lane position remains unchanged
-      this.currentLane = currentLane;
+    // Add to removal list
+    if (!this.objectsToRemove.includes(obj)) {
+      this.objectsToRemove.push(obj);
     }
+    
+    // Play collect sound
+    this.sound.play('collect');
+    
+    // Update internal score
+    this.score += 10;
+    
+    // Emit event to React
+    if (this.game && this.game.events) {
+      this.game.events.emit('updateScore', 10);
+    }
+    
+    // Hide sprite
+    if (obj.sprite) {
+      obj.sprite.visible = false;
+    }
+    
+    // Create effect
+    this.createCollectParticles(obj.sprite.x, obj.sprite.y);
+    
+    // Schedule sprite destruction
+    this.time.delayedCall(50, () => {
+      if (obj.sprite && !obj.sprite.destroyed) {
+        obj.sprite.destroy();
+        obj.sprite = null;
+      }
+    });
   }
   
   createCollectParticles(x, y) {
@@ -866,21 +716,11 @@ export class MainScene extends Phaser.Scene {
     this.isGameOver = true;
     
     // Play hit sound
-    console.log('🎵 Playing hit sound');
-    if (this.sound && this.sound.sounds.hit) {
-      this.sound.play('hit', { volume: 0.7 });
-    } else {
-      console.warn('Hit sound not available');
-    }
+    this.sound.play('hit');
     
     // Play game over sound after short delay
     this.time.delayedCall(500, () => {
-      console.log('🎵 Playing gameover sound');
-      if (this.sound && this.sound.sounds.gameover) {
-        this.sound.play('gameover', { volume: 0.5 });
-      } else {
-        console.warn('Gameover sound not available');
-      }
+      this.sound.play('gameover');
     });
     
     // Flash player
@@ -897,29 +737,16 @@ export class MainScene extends Phaser.Scene {
     // Create crash effect
     this.createCrashEffect(obj.sprite.x, obj.sprite.y);
     
-    // Emit game over event once
-    try {
-      if (this.game && this.game.events) {
-        this.game.events.emit('gameOver', this.score);
-      }
-    } catch (error) {
-      console.error('Error emitting game over event:', error);
+    // Emit game over event
+    if (this.game && this.game.events) {
+      this.game.events.emit('gameOver', this.score);
     }
     
-    // Don't transition to GameOverScene - let React handle this
-    // Just pause the game after a short delay
+    // Pause the scene after a short delay
     this.time.delayedCall(2000, () => {
-      try {
-        this.tweens.killAll();
-        
-        // Mark game as not running (for Player input handling)
-        this.game.isRunning = false;
-        
-        // Pause the scene
-        this.scene.pause();
-      } catch (error) {
-        console.error('Error pausing scene:', error);
-      }
+      this.tweens.killAll();
+      this.game.isRunning = false;
+      this.scene.pause();
     });
   }
   
@@ -994,7 +821,7 @@ export class MainScene extends Phaser.Scene {
     this.input.off('pointerup', this.endSwipe, this);
     this.input.off('pointerdown', this.handleJumpInput, this);
     
-    // Mark game as not running (for Player input handling)
+    // Mark game as not running
     if (this.game) {
       this.game.isRunning = false;
     }

@@ -11,11 +11,11 @@ const GamePage = () => {
   const { 
     isPlaying, 
     startGame, 
-    gameOver, 
-    volume, 
-    isMuted, 
-    toggleMute, 
-    changeVolume 
+    gameOver,
+    isMuted,
+    toggleMute,
+    volume,
+    changeVolume
   } = useContext(GameContext);
   
   const navigate = useNavigate();
@@ -85,41 +85,6 @@ const GamePage = () => {
               />
             </div>
           )}
-          
-          {/* Test audio button */}
-          <button 
-            className="game-page__test-audio"
-            onClick={() => {
-              // Create and play a test audio sound
-              const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-              const oscillator = audioContext.createOscillator();
-              const gainNode = audioContext.createGain();
-              
-              oscillator.connect(gainNode);
-              gainNode.connect(audioContext.destination);
-              
-              oscillator.type = 'sine';
-              oscillator.frequency.value = 440; // A4 note
-              gainNode.gain.value = 0.5;
-              
-              oscillator.start();
-              setTimeout(() => {
-                oscillator.stop();
-              }, 500);
-              
-              console.log('Audio test played - did you hear a beep?');
-            }}
-            style={{
-              backgroundColor: '#4f46e5',
-              color: 'white',
-              padding: '4px 8px',
-              borderRadius: '4px',
-              fontSize: '0.8rem',
-              marginLeft: '8px'
-            }}
-          >
-            Test Audio
-          </button>
         </div>
       </div>
       

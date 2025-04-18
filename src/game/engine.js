@@ -73,11 +73,8 @@ export class GameEngine {
           pixelArt: false,
           antialias: true
         },
-        // Add explicit audio config
-        audio: {
-          disableWebAudio: false,
-          noAudio: false
-        }
+        // CRITICAL FIX: Remove any audio property that might be disabling audio
+        // Removing the entire audio property to use default settings
       };
       
       // Create Phaser game instance
@@ -227,6 +224,7 @@ export class GameEngine {
     this.volume = volume;
     
     if (this.game && this.game.sound) {
+      // IMPORTANT FIX: Set global volume directly
       this.game.sound.volume = volume;
       console.log('Game volume set to:', volume);
     }
@@ -236,6 +234,7 @@ export class GameEngine {
     this.isMuted = !this.isMuted;
     
     if (this.game && this.game.sound) {
+      // IMPORTANT FIX: Set mute state directly
       this.game.sound.mute = this.isMuted;
       console.log('Game sound muted:', this.isMuted);
     }

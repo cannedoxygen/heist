@@ -254,13 +254,8 @@ export class Player {
     // Update sprite to jumping state
     this.updateSpriteVisibility();
     
-    // Play jump sound directly
-    console.log('🎵 Player playing jump sound');
-    if (this.scene.sound && this.scene.sound.sounds && this.scene.sound.sounds.jump) {
-      this.scene.sound.play('jump', { volume: 0.7 });
-    } else {
-      console.warn('Jump sound not available in scene');
-    }
+    // MINIMAL FIX: Simply play the jump sound
+    this.scene.sound.play('jump');
     
     // Create jump effect
     this.createJumpEffect();
