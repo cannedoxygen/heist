@@ -1,4 +1,4 @@
-// src/services/gameService.js - Fixed version
+// src/services/gameService.js
 import { GameEngine } from '../game/engine';
 
 // Game service singleton
@@ -52,8 +52,9 @@ export const gameService = {
     try {
       console.log("gameService.startGame called with difficulty:", difficulty);
       
+      // Skip automatic resize to prevent dimension changes
+      
       // First, trigger the startGame event on the game instance
-      // This will notify the MainScene to actually start the game
       if (gameInstance.game && gameInstance.game.events) {
         console.log("Emitting startGame event to game instance");
         gameInstance.game.events.emit('startGame');

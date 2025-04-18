@@ -29,8 +29,10 @@ export const GameContextProvider = ({ children }) => {
       setScore(0); // Reset score when starting game
       setPlayerRank(null);
       setIsHighScore(false);
+      
+      console.log("Game started with difficulty:", difficulty);
     }
-  }, [isConnected, isCorrectNetwork]);
+  }, [isConnected, isCorrectNetwork, difficulty]);
   
   // End game
   const endGame = useCallback(async (finalScore) => {
@@ -46,9 +48,10 @@ export const GameContextProvider = ({ children }) => {
         const result = await leaderboardService.updateScore(walletAddress, scoreToSubmit);
         setPlayerRank(result.rank);
         setIsHighScore(result.isHighScore);
+        
+        console.log("Game over with score:", scoreToSubmit, "Rank:", result.rank);
       } catch (error) {
         console.error('Error updating score:', error);
-        // Add user-friendly error handling
       }
     }
   }, [walletAddress, score]);
@@ -79,10 +82,21 @@ export const GameContextProvider = ({ children }) => {
     setDifficulty(newDifficulty);
   }, []);
   
-  // Restart game
+  // Restart game - enhanced to handle proper state reset
   const restartGame = useCallback(() => {
-    startGame();
-  }, [startGame]);
+    // Reset game state first
+    setGameOver(false);
+    setScore(0);
+    setPlayerRank(null);
+    setIsHighScore(false);
+    
+    // Small delay before starting game to ensure clean state
+    setTimeout(() => {
+      startGame();
+    }, 50);
+    
+    console.log("Game restarted with difficulty:", difficulty);
+  }, [startGame, difficulty]);
   
   // Context value
   const value = {

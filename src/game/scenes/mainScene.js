@@ -10,6 +10,7 @@ export class MainScene extends Phaser.Scene {
     // Game state
     this.score = 0;
     this.isGameOver = false;
+    this._gameOverEmitted = false;
     
     // Difficulty settings
     this.difficulties = {
@@ -47,6 +48,7 @@ export class MainScene extends Phaser.Scene {
     // Reset game state
     this.score = 0;
     this.isGameOver = false;
+    this._gameOverEmitted = false;
     this.objectsPool = [];
     this.objectsToRemove = [];
     
@@ -64,10 +66,14 @@ export class MainScene extends Phaser.Scene {
     this.obstacleInterval = this.difficulties[this.difficulty].obstacleInterval;
     this.dataInterval = this.difficulties[this.difficulty].dataInterval;
     
-    // Reset TronGrid speed multiplier
+    // Clear any existing TronGrid
     if (this.tronGrid) {
-      this.tronGrid.setSpeedMultiplier(1.0);
+      this.tronGrid.destroy();
+      this.tronGrid = null;
     }
+    
+    // Create a new TronGrid with fresh dimensions
+    this.createTronGrid();
     
     // Current lane (start in center)
     this.currentLane = 1;
@@ -139,8 +145,10 @@ export class MainScene extends Phaser.Scene {
     // Set background color
     this.cameras.main.setBackgroundColor(0x0a0e17);
     
-    // Create the Tron grid
-    this.createTronGrid();
+    // Create the Tron grid (if not already created in init)
+    if (!this.tronGrid) {
+      this.createTronGrid();
+    }
     
     // Create player
     this.createPlayer();
@@ -154,6 +162,7 @@ export class MainScene extends Phaser.Scene {
     
     // Reset game state
     this.isGameOver = false;
+    this._gameOverEmitted = false;
     this.spawnTimer = this.obstacleInterval;
     this.dataSpawnTimer = this.dataInterval;
     
@@ -174,6 +183,26 @@ export class MainScene extends Phaser.Scene {
       this.sound.unlock();
     }
     
+    // Reset spawn timers for consistent experience
+    this.spawnTimer = this.obstacleInterval;
+    this.dataSpawnTimer = this.dataInterval;
+    
+    // Make sure TronGrid is properly initialized with current dimensions
+    if (this.tronGrid) {
+      // Force update with current dimensions
+      this.tronGrid.config.horizonY = this.gameHeight * 0.35;
+      this.tronGrid.config.gridWidth = this.gameWidth * 0.8;
+      
+      // Make sure all elements are visible
+      this.tronGrid.setVisible(true);
+      
+      // Force an update to apply current dimensions
+      this.tronGrid.update(16.67);
+    } else {
+      // Create if not exists
+      this.createTronGrid();
+    }
+    
     // Populate initial objects
     this.populateInitialObjects();
     
@@ -182,9 +211,14 @@ export class MainScene extends Phaser.Scene {
   }
   
   createTronGrid() {
+    // Clean up existing TronGrid if it exists
     if (this.tronGrid) {
       this.tronGrid.destroy();
+      this.tronGrid = null;
     }
+    
+    // Create new TronGrid with current dimensions
+    console.log("Creating TronGrid with dimensions:", this.gameWidth, "x", this.gameHeight);
     
     this.tronGrid = new TronGrid(this, {
       horizonY: this.gameHeight * 0.35,
@@ -200,6 +234,11 @@ export class MainScene extends Phaser.Scene {
       lineWidth: 2,
       colorCycleSpeed: 0.0005
     });
+    
+    // Ensure visibility
+    if (this.tronGrid) {
+      this.tronGrid.setVisible(true);
+    }
   }
   
   createPlayer() {
@@ -276,7 +315,9 @@ export class MainScene extends Phaser.Scene {
     this.gameWidth = width;
     this.gameHeight = height;
     
-    // Recreate the TronGrid with new dimensions
+    console.log("MainScene.handleResize called with", width, "x", height);
+    
+    // Always recreate TronGrid with new dimensions
     this.createTronGrid();
     
     // Update player position if it exists
@@ -337,15 +378,16 @@ export class MainScene extends Phaser.Scene {
   }
   
   update(time, delta) {
+    // Always update the TronGrid, even if the game is over
+    if (this.tronGrid) {
+      this.tronGrid.update(delta);
+    }
+    
+    // Skip rest of game logic if game is over
     if (this.isGameOver) return;
     
     // Store current lane to protect against accidental changes
     const savedLane = this.currentLane;
-    
-    // Update the Tron grid
-    if (this.tronGrid) {
-      this.tronGrid.update(delta);
-    }
     
     // Spawn timers
     this.updateSpawnTimers(delta);
@@ -737,17 +779,15 @@ export class MainScene extends Phaser.Scene {
     // Create crash effect
     this.createCrashEffect(obj.sprite.x, obj.sprite.y);
     
-    // Emit game over event
-    if (this.game && this.game.events) {
+    // IMPORTANT: Only emit game over event ONCE
+    if (this.game && this.game.events && !this._gameOverEmitted) {
+      this._gameOverEmitted = true; // Flag to prevent multiple emissions
+      console.log("Emitting gameOver event with score:", this.score);
       this.game.events.emit('gameOver', this.score);
     }
     
-    // Pause the scene after a short delay
-    this.time.delayedCall(2000, () => {
-      this.tweens.killAll();
-      this.game.isRunning = false;
-      this.scene.pause();
-    });
+    // Set game running to false
+    this.game.isRunning = false;
   }
   
   createCrashEffect(x, y) {

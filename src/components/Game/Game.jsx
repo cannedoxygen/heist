@@ -16,7 +16,8 @@ const Game = () => {
     gameOver,
     difficulty,
     volume,
-    isMuted 
+    isMuted,
+    restartGame: contextRestartGame 
   } = useContext(GameContext);
   
   const { isConnected, isCorrectNetwork } = useWallet();
@@ -26,6 +27,17 @@ const Game = () => {
   const gameInstanceRef = useRef(null);
   const [containerReady, setContainerReady] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  
+  // Enhanced restart game function
+  const restartGame = () => {
+    if (gameContainerRef.current) {
+      setTimeout(() => {
+        contextRestartGame();
+      }, 50);
+    } else {
+      contextRestartGame();
+    }
+  };
   
   // Redirect to home if not connected
   useEffect(() => {
@@ -141,17 +153,26 @@ const Game = () => {
     };
   }, [isInitialized]);
   
-  // Remove React StrictMode to prevent double rendering
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log("Running in development mode - watch for React StrictMode in index.js");
-    }
-  }, []);
-  
   return (
     <div className="game-container">
-      {/* Game HUD */}
-      <div className="game-hud">
+      {/* Game Canvas - Fix size with absolute dimensions */}
+      <div 
+        id="game-container" 
+        ref={gameContainerRef} 
+        className="game-canvas"
+        style={{ 
+          width: '100%', 
+          height: '100%',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+        }}
+      ></div>
+      
+      {/* Game HUD - Position as overlay */}
+      <div className="game-hud" style={{ position: 'relative', zIndex: 10 }}>
         <div className="game-score">
           <div className="game-score__label">SCORE</div>
           <div className="game-score__value">{score}</div>
@@ -163,17 +184,9 @@ const Game = () => {
         </div>
       </div>
       
-      {/* Game Canvas */}
-      <div 
-        id="game-container" 
-        ref={gameContainerRef} 
-        className="game-canvas"
-        style={{ width: '100%', height: '100%' }}
-      ></div>
-      
-      {/* Game Controls overlay when not playing */}
+      {/* Game Controls overlay */}
       {!isPlaying && !gameOver && (
-        <div className="game-controls__overlay">
+        <div className="game-controls__overlay" style={{ position: 'absolute', zIndex: 20 }}>
           <button 
             onClick={() => gameService.startGame(difficulty)} 
             className="game-controls__start-button"
@@ -185,7 +198,7 @@ const Game = () => {
       )}
       
       {/* Game Over Overlay */}
-      {gameOver && <GameOver score={score} />}
+      {gameOver && <GameOver score={score} restartGame={restartGame} />}
     </div>
   );
 };

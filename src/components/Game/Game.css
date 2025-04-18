@@ -1,19 +1,29 @@
-/* src/components/Game/Game.css - UPDATED */
+/* src/components/Game/Game.css */
 .game-container {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    width: 100%;
     position: relative;
+    width: 100%;
+    height: 100%;
     overflow: hidden;
-    background-color: var(--bg-primary);
   }
   
-  .game-hud {
+  .game-canvas {
     position: absolute;
     top: 0;
     left: 0;
-    right: 0;
+    width: 100% !important;
+    height: 100% !important;
+    overflow: hidden;
+    background-color: var(--bg-primary);
+    z-index: var(--z-game);
+  }
+  
+  /* Ensure canvas element itself has fixed size */
+  canvas {
+    width: 100% !important;
+    height: 100% !important;
+  }
+  
+  .game-hud {
     display: flex;
     justify-content: space-between;
     padding: var(--space-md);
@@ -46,34 +56,37 @@
     font-family: 'Orbitron', sans-serif;
   }
   
-  .game-canvas {
-    position: relative;
+  .game-controls__overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
     width: 100%;
     height: 100%;
-    background-color: var(--bg-primary);
-    z-index: var(--z-game);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background-color: rgba(0, 0, 0, 0.7);
+    z-index: var(--z-ui);
   }
   
-  /* GameCanvas.css - UPDATED */
-  .game-canvas-container {
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-    background-color: var(--bg-primary);
-    position: relative;
+  .game-controls__start-button {
+    background: linear-gradient(90deg, var(--accent-tertiary), var(--accent-primary));
+    border: none;
+    padding: var(--space-md) var(--space-xl);
+    font-size: 1.5rem;
+    box-shadow: 0 0 20px rgba(79, 70, 229, 0.5);
+    margin-bottom: var(--space-md);
+    animation: pulse 2s infinite;
+    font-family: 'Orbitron', sans-serif;
+    color: white;
+    border-radius: var(--radius-md);
+    cursor: pointer;
   }
   
-  /* Phaser canvas element styles */
-  canvas {
-    display: block;
-    margin: 0 auto;
-    image-rendering: optimizeSpeed;
-    image-rendering: -moz-crisp-edges;
-    image-rendering: -webkit-optimize-contrast;
-    image-rendering: optimize-contrast;
-    -ms-interpolation-mode: nearest-neighbor;
-    width: 100% !important;
-    height: 100% !important;
+  .game-controls__hint {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
   }
   
   /* Game loading indicator */
@@ -104,52 +117,8 @@
     100% { transform: rotate(360deg); }
   }
   
-  /* GamePage.css adjustments */
-  .game-page__content {
-    position: relative;
-    flex: 1;
-    width: 100%;
-    height: calc(100vh - var(--header-height) - var(--footer-height));
-    overflow: hidden;
-  }
-  
-  /* Make sure game fills the available space in different viewports */
-  @media (max-width: 768px) {
-    .game-score__label, .game-difficulty__label {
-      font-size: 0.6rem;
-    }
-    
-    .game-score__value, .game-difficulty__value {
-      font-size: 1rem;
-    }
-    
-    .game-hud {
-      padding: var(--space-sm);
-    }
-  }
-  
-  /* Portrait mode handling for mobile */
-  @media (max-width: 576px) and (orientation: portrait) {
-    .game-page__content {
-      height: calc(100vh - var(--header-height) - var(--footer-height) - 60px);
-    }
-    
-    .game-hud {
-      padding: var(--space-xs);
-    }
-  }
-  
-  /* Landscape mode handling for mobile */
-  @media (max-height: 450px) and (orientation: landscape) {
-    .game-page__header {
-      height: 40px;
-    }
-    
-    .game-page__footer {
-      height: 30px;
-    }
-    
-    .game-page__content {
-      height: calc(100vh - 70px);
-    }
+  @keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
   }

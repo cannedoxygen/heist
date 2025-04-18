@@ -64,17 +64,14 @@ export class GameEngine {
           }
         },
         scale: {
-          mode: Phaser.Scale.RESIZE,
-          autoCenter: Phaser.Scale.CENTER_BOTH,
+          mode: Phaser.Scale.NONE, // Disable auto-scaling
           width: containerWidth,
           height: containerHeight
         },
         render: {
           pixelArt: false,
           antialias: true
-        },
-        // CRITICAL FIX: Remove any audio property that might be disabling audio
-        // Removing the entire audio property to use default settings
+        }
       };
       
       // Create Phaser game instance
@@ -105,11 +102,17 @@ export class GameEngine {
   }
   
   setupEventListeners() {
+    // Remove any existing listeners first
+    this.removeEventListeners();
+    
     // Add window resize listener
     window.addEventListener('resize', this.boundHandleResize);
     
     // Game event listeners
     if (this.game && this.game.events) {
+      this.game.events.off('updateScore', this.boundHandleScoreUpdate);
+      this.game.events.off('gameOver', this.boundHandleGameOver);
+      
       this.game.events.on('updateScore', this.boundHandleScoreUpdate);
       this.game.events.on('gameOver', this.boundHandleGameOver);
     }
@@ -148,7 +151,18 @@ export class GameEngine {
     const width = containerElement.offsetWidth;
     const height = containerElement.offsetHeight;
     
-    // Update game dimensions
+    console.log("Manual resize to:", width, "x", height);
+    
+    // Set canvas size explicitly
+    const canvas = this.game.canvas;
+    if (canvas) {
+      canvas.style.width = width + 'px';
+      canvas.style.height = height + 'px';
+      canvas.width = width;
+      canvas.height = height;
+    }
+    
+    // Update internal dimensions
     this.game.scale.resize(width, height);
     
     // Store updated dimensions
@@ -160,8 +174,6 @@ export class GameEngine {
     if (activeScene && typeof activeScene.handleResize === 'function') {
       activeScene.handleResize(width, height);
     }
-    
-    console.log('Game resized to:', width, 'x', height);
   }
   
   start(difficulty = 'normal') {
@@ -209,6 +221,8 @@ export class GameEngine {
   }
   
   handleGameOver(finalScore) {
+    if (!this.isRunning) return; // Prevent duplicate calls
+    
     this.isRunning = false;
     
     // Call external callback with validated score

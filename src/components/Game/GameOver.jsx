@@ -1,14 +1,14 @@
+// src/components/Game/GameOver.jsx
 import React, { useContext } from 'react';
 import { GameContext } from '../../context/GameContext';
 import { WalletContext } from '../../context/WalletContext';
 import Button from '../UI/Button/Button';
 import './GameOver.css';
 
-const GameOver = ({ score }) => {
+const GameOver = ({ score, restartGame }) => {
   const { 
     playerRank, 
-    isHighScore, 
-    restartGame 
+    isHighScore
   } = useContext(GameContext);
   
   const { formatAddress, walletAddress } = useContext(WalletContext);
